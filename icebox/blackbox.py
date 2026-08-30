@@ -22,6 +22,7 @@ class Sample:
     accel: tuple = (0.0, 0.0, 1.0)       # g, body frame (specific force)
     joints: tuple = ()                    # optional joint positions, rad
     currents: tuple = ()                  # optional joint currents, A
+    pos: tuple = (0.0, 0.0)               # world x,y meters (traverse)
     vbatt: float = 25.2                   # V
     temp: float = 21.0                    # C
 
@@ -338,13 +339,14 @@ def pack_heartbeat(seq: int, s: Sample, state: int, buffered: int, pct: int) -> 
 # humanoid pose (quat + |a| + tilt), +2 B per joint. At 8 Hz that is
 # ~1.7 kbps of the 2 kbps link; heartbeats ride above it in priority.
 
-ST_HEAD = struct.Struct("<2sHdhhhhHBB")  # magic seq t quat4 amag_mg tilt nj
+ST_HEAD = struct.Struct("<2sHdhhhhHBBhh")  # magic seq t quat4 amag tilt nj posx posy
 ST_MAGIC = b"ST"
 
 
 def pack_state(seq: int, s: Sample, amag_g: float | None = None) -> bytes:
     """amag_g: peak-hold |a| since the previous frame (an 8 Hz stream would
-    otherwise sample right past a 40 ms impact spike)."""
+    otherwise sample right past a 40 ms impact spike). Position rides along
+    as int16 centimeters (traverse tracking, +-163 m)."""
     if amag_g is None:
         amag_g = _mag(s.accel)
     body = ST_HEAD.pack(
@@ -352,7 +354,9 @@ def pack_state(seq: int, s: Sample, amag_g: float | None = None) -> bytes:
         _q(s.quat[0], SCALES[3]["quat"]), _q(s.quat[1], SCALES[3]["quat"]),
         _q(s.quat[2], SCALES[3]["quat"]), _q(s.quat[3], SCALES[3]["quat"]),
         min(65535, int(amag_g * 1000)), min(255, int(tilt_deg(s.quat))),
-        len(s.joints))
+        len(s.joints),
+        max(-32767, min(32767, int(s.pos[0] * 100))),
+        max(-32767, min(32767, int(s.pos[1] * 100))))
     if s.joints:
         body += struct.pack(f"<{len(s.joints)}h", *(_q(j, Q_JOINT) for j in s.joints))
     return body + struct.pack("<H", crc16(body))
@@ -363,7 +367,7 @@ def unpack_state(pkt: bytes) -> dict | None:
         return None
     if crc16(pkt[:-2]) != struct.unpack("<H", pkt[-2:])[0]:
         return None
-    m, seq, t, q0, q1, q2, q3, amag, tilt, nj = ST_HEAD.unpack_from(pkt)
+    m, seq, t, q0, q1, q2, q3, amag, tilt, nj, px, py = ST_HEAD.unpack_from(pkt)
     joints = []
     if nj:
         if len(pkt) != ST_HEAD.size + nj * 2 + 2:
@@ -374,6 +378,7 @@ def unpack_state(pkt: bytes) -> dict | None:
     return {"type": "state", "seq": seq, "t": t,
             "quat": [q0 * sc, q1 * sc, q2 * sc, q3 * sc],
             "accel_g": amag / 1000.0, "tilt": tilt, "joints": joints,
+            "pos": [px / 100.0, py / 100.0],
             "bytes": len(pkt)}
 
 

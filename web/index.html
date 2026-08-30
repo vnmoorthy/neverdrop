@@ -582,6 +582,7 @@ function updateBadges(){
 }
 function setView(v){
   S.view = v;
+  if(v === "replay"){ outer.position.x = 0; outer.position.z = 0; }  // replay at origin
   $("btn-live").classList.toggle("toggled", v==="live");
   if(v==="live"){ R.playing = false; $("btn-play").textContent = "▶ REPLAY"; }
   else $("btn-play").textContent = R.playing? "❚❚ PAUSE" : "▶ PLAY";
@@ -613,9 +614,14 @@ function applyFrame(i){
 function tick(ts){
   requestAnimationFrame(tick);
   const dt = Math.min(.1, (ts - R.lastTs)/1000); R.lastTs = ts;
-  // gentle camera orbit (+ impact shake)
+  // gentle camera orbit (+ impact shake), centered on the robot's traverse
   const t = ts/1000;
-  camera.position.x = Math.cos(t*.08)*4.4; camera.position.z = Math.sin(t*.08)*4.4;
+  const cx = (S.view==="live" && S.pose && S.pose.pos)? S.pose.pos[0] : 0;
+  const cz = (S.view==="live" && S.pose && S.pose.pos)? -S.pose.pos[1] : 0;
+  S._camx = (S._camx===undefined)? cx : S._camx + (cx-S._camx)*.04;   // smooth follow
+  S._camz = (S._camz===undefined)? cz : S._camz + (cz-S._camz)*.04;
+  camera.position.x = S._camx + Math.cos(t*.08)*4.4;
+  camera.position.z = S._camz + Math.sin(t*.08)*4.4;
   camera.position.y = 2.0;
   if(fx > 0.01){
     camera.position.x += (Math.random()-.5)*fx*.16;
@@ -628,9 +634,10 @@ function tick(ts){
   } else if(impactLight.intensity > 0){
     impactLight.intensity = 0; impactRing.material.opacity = 0;
   }
-  camera.lookAt(0,.6,0);
+  camera.lookAt(S._camx||0,.6,S._camz||0);
   // live twin: latest streamed pose drives the robot directly
   if(S.view === "live" && S.pose){
+    if(S.pose.pos){ outer.position.x = S.pose.pos[0]; outer.position.z = -S.pose.pos[1]; }
     const nj = S.pose.joints.length;
     if(nj && !armChain) setModel(nj);
     if(!nj && !humanoid) setModel(0);
@@ -799,7 +806,7 @@ function handle(ev, replayed){
       S.liveCount++;
       if(ev.t >= (S._lastPoseT||0)){       // stale frame after restore: skip pose
         S._lastPoseT = ev.t;
-        S.pose = {quat: ev.quat, joints: ev.joints||[]};
+        S.pose = {quat: ev.quat, joints: ev.joints||[], pos: ev.pos||[0,0]};
       }
       S.lastStateRx = Date.now();
       S.tele.push({t: ev.t, a: ev.accel_g, tilt: ev.tilt});

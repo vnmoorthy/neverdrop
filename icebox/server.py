@@ -140,11 +140,13 @@ class Onboard:
                     self.gap_buf.append(s)
                 was_up = self.link.up
             # self-throttle: while a burst/backfill is draining, drop to 2 Hz
-            # so the important bytes get the link (twin stays alive, chunkier)
+            # so the important bytes get the link (twin stays alive, chunkier).
+            # base rates keep frames+heartbeats under 2,000 bps:
+            #   humanoid 30 B x 7 Hz = 1,680 b/s;  arm 42 B x 5 Hz = 1,680 b/s
             if self.link.queued > 3:
                 rate = 2.0
             else:
-                rate = 6.0 if (s and s.joints) else 8.0
+                rate = 5.0 if (s and s.joints) else 7.0
             await asyncio.sleep(1.0 / rate)
 
     async def _heartbeat_loop(self):

@@ -36,6 +36,13 @@ class SimSource:
         self._fall_t0: float | None = None
         self._rng = random.Random(7)
         self.vbatt = 25.2
+        # traverse state: the robot has a job, not a pose
+        self._px, self._py = 0.0, 0.0
+        self._yaw = 0.0
+        self._last_t: float | None = None
+        self._stumble_at = 18.0            # first gust ~18 s in
+        self._stumble_t0: float | None = None
+        self._t_start: float | None = None
 
     def fall(self):
         if self._fall_t0 is None:
@@ -46,18 +53,55 @@ class SimSource:
 
     def _nominal(self, t: float) -> Sample:
         g = self._rng.gauss
+        if self._t_start is None:
+            self._t_start = t
+        dt = min(0.1, t - self._last_t) if self._last_t else 0.0
+        self._last_t = t
+        el = t - self._t_start
+
+        # --- walk the traverse: wandering heading, steered back inside r=4 m
+        wander = 0.28 * math.sin(el * 0.21) + 0.12 * math.sin(el * 0.045)
+        r = math.hypot(self._px, self._py)
+        steer = 0.0
+        if r > 3.2:
+            to_home = math.atan2(-self._py, -self._px)
+            d = (to_home - self._yaw + math.pi) % (2 * math.pi) - math.pi
+            steer = 1.4 * d
+        self._yaw += (wander + steer) * dt
+        speed = 0.55
+        self._px += speed * math.cos(self._yaw) * dt
+        self._py += speed * math.sin(self._yaw) * dt
+
+        # --- gust stumble every ~25-45 s: stagger + g-spike, then recover
+        # (2.2 g peak stays under the 3 g crash floor: drama, not an incident)
+        stumble_roll = stumble_pitch = 0.0
+        acc_spike = 0.0
+        if self._stumble_t0 is None and el >= self._stumble_at:
+            self._stumble_t0 = t
+        if self._stumble_t0 is not None:
+            ft = t - self._stumble_t0
+            if ft < 1.3:
+                k = math.sin(math.pi * ft / 1.3)
+                stumble_pitch = math.radians(13) * k
+                stumble_roll = math.radians(7) * math.sin(2 * math.pi * ft / 1.3)
+                acc_spike = 1.2 * math.exp(-((ft - 0.35) / 0.06) ** 2)
+            else:
+                self._stumble_t0 = None
+                self._stumble_at = el + self._rng.uniform(25, 45)
+
         bounce = 0.25 * math.sin(2 * math.pi * 1.9 * t)
         sway = math.radians(2.5) * math.sin(2 * math.pi * 0.9 * t)
-        # visible life for the live twin: slow heading wander + gait pitch bob
-        yaw = 0.9 * math.sin(t * 0.21) + 0.35 * math.sin(t * 0.047)
         bob = math.radians(3.0) * math.sin(2 * math.pi * 1.9 * t + 0.6)
-        quat = _quat_from_euler(sway + g(0, 0.004), bob + g(0, 0.004), yaw)
+        quat = _quat_from_euler(sway + stumble_roll + g(0, 0.004),
+                                bob + stumble_pitch + g(0, 0.004), self._yaw)
         return Sample(
             t=t, quat=quat,
             gyro=(0.12 * math.cos(2 * math.pi * 0.9 * t) + g(0, 0.02),
-                  g(0, 0.02), 0.19 * math.cos(t * 0.21) + g(0, 0.01)),
-            accel=(g(0, 0.02), g(0, 0.02), 1.0 + bounce * 0.15 + g(0, 0.02)),
-            vbatt=self.vbatt, temp=18.0 + g(0, 0.1))
+                  g(0, 0.02), wander + steer + g(0, 0.01)),
+            accel=(acc_spike * 0.7 + g(0, 0.02), g(0, 0.02),
+                   1.0 + bounce * 0.15 + acc_spike * 0.7 + g(0, 0.02)),
+            vbatt=self.vbatt, temp=18.0 + g(0, 0.1),
+            pos=(self._px, self._py))
 
     def _falling(self, t: float, ft: float) -> Sample:
         g = self._rng.gauss
@@ -86,9 +130,10 @@ class SimSource:
             pitch = math.radians(90.5)
             wp = g(0, 0.005)
             acc = (0.99 + g(0, 0.01), g(0, 0.01), 0.03 + g(0, 0.01))
-        quat = _quat_from_euler(g(0, 0.01), pitch, 0.0)
+        quat = _quat_from_euler(g(0, 0.01), pitch, self._yaw)
         return Sample(t=t, quat=quat, gyro=(g(0, 0.02), wp, g(0, 0.02)),
-                      accel=acc, vbatt=self.vbatt, temp=18.0)
+                      accel=acc, vbatt=self.vbatt, temp=18.0,
+                      pos=(self._px, self._py))
 
     async def stream(self):
         dt = 1.0 / self.rate_hz
