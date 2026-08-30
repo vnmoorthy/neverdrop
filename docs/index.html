@@ -138,8 +138,72 @@ input[type=range]{accent-color:var(--accent)}
 #incident-banner{font-family:var(--disp);font-weight:800;font-size:64px;letter-spacing:.06em;color:#fff;background:var(--bad);padding:10px 42px 16px;box-shadow:0 20px 80px rgba(0,0,0,.5)}
 #incident-cause{text-align:center;color:#fff;font-size:14px;letter-spacing:.12em;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.6)}
 @media (prefers-reduced-motion: reduce){.pill.INCIDENT,#incident-overlay.on,.blk.on,#replay-empty .big{animation:none}}
+
+/* ============ polish pass: cards, glass, depth, rhythm ============ */
+#topbar{background:rgba(253,253,254,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  padding:13px 22px;gap:24px;border-bottom:1px solid rgba(23,26,32,.07)}
+.tb-item .k{font-size:8.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.tb-item .v{font-size:15px}
+#linkbar{border-radius:99px;height:6px;overflow:hidden;border:none;background:#E3E9EE}
+.srcbadge{border-radius:99px;border-style:solid;font-size:9.5px;font-weight:600;font-family:var(--ui);text-transform:uppercase}
+
+#main{gap:14px;padding:14px;grid-template-columns:330px 1fr 320px}
+.col{border:none !important;gap:14px;background:transparent}
+.col::-webkit-scrollbar{width:0}
+.panel{background:var(--surface);border:1px solid rgba(23,26,32,.055);border-radius:12px;border-bottom:1px solid rgba(23,26,32,.055);
+  padding:16px 18px;box-shadow:0 1px 2px rgba(23,26,32,.04), 0 14px 34px -22px rgba(23,26,32,.22)}
+#center{gap:0}
+#view3d{border-radius:12px;border:1px solid rgba(23,26,32,.055);
+  box-shadow:0 1px 2px rgba(23,26,32,.04), 0 18px 44px -24px rgba(23,26,32,.28)}
+#transport{margin-top:14px;background:var(--surface);border:1px solid rgba(23,26,32,.055);border-radius:12px;border-top:1px solid rgba(23,26,32,.055);
+  padding:12px 14px;box-shadow:0 1px 2px rgba(23,26,32,.04)}
+#spark{border:none;border-radius:8px;background:#F4F7F9;height:56px}
+
+.strip canvas{height:46px;border:none;border-radius:8px;background:#F5F8FA}
+.strip .lab{font-family:var(--ui);font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase}
+.strip .lab b{font-family:var(--mono);font-size:12px;letter-spacing:0}
+
+button{white-space:nowrap;transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease}
+button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(23,26,32,.10)}
+button.primary:hover{box-shadow:0 6px 18px rgba(232,33,39,.38)}
+.chip{border-radius:99px;padding:4px 11px;font-family:var(--ui);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.badge{border-radius:99px;padding:5px 12px;background:rgba(255,255,255,.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  font-family:var(--ui);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;border-color:rgba(23,26,32,.08)}
+.blk{border-radius:2.5px}
+#incident-log .item{border-radius:10px;border-color:rgba(23,26,32,.07);padding:10px 12px;transition:border-color .14s, box-shadow .14s}
+#incident-log .item:hover,#incident-log .item.sel{box-shadow:0 3px 12px rgba(232,33,39,.12)}
+#gforce-hud .g{font-family:var(--ui);font-weight:300;font-size:56px;letter-spacing:-.02em}
+#gforce-hud .k{font-family:var(--ui);font-weight:600;font-size:8px;letter-spacing:.3em}
+#replay-empty{font-family:var(--ui);letter-spacing:.2em;text-transform:uppercase;font-size:10px}
+#replay-empty .big{font-family:var(--ui);font-weight:800;font-size:22px;letter-spacing:.34em}
+#tlabel{font-family:var(--mono);font-size:11px}
+.tagline,#analysis .sum{font-family:var(--ui)}
+#analysis .sum{font-size:13px;line-height:1.65}
+#opstrip{background:rgba(253,253,254,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid rgba(23,26,32,.07);padding:12px 22px;gap:20px}
+.op-group .k{font-family:var(--ui);font-size:8.5px;font-weight:700;letter-spacing:.22em}
+.op-group output{font-family:var(--mono);font-size:10.5px}
+input[type=range]{width:110px}
+#blackout .bo-sub{font-family:var(--ui);letter-spacing:.16em;text-transform:uppercase;font-size:10.5px}
+#recovered{border-radius:99px;font-family:var(--ui);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase}
+
+/* responsive: keep composition at any width */
+#main{grid-template-columns:minmax(250px,330px) minmax(340px,1fr) minmax(230px,320px)}
+#replay-badges{max-width:calc(100% - 140px);flex-wrap:wrap}
+#transport .row{flex-wrap:wrap}
+.tb-item .v{white-space:nowrap}
+@media (max-width:1180px){
+  #topbar{gap:14px}
+  .srcbadge{display:none}
+  #main{grid-template-columns:minmax(230px,290px) minmax(320px,1fr) minmax(210px,280px)}
+}
+@media (max-width:960px){
+  #topbar .tb-item:last-child{display:none}          /* NO CLOUD chip */
+  #main{grid-template-columns:minmax(210px,260px) 1fr;grid-template-rows:1fr}
+  .col:last-child{display:none}                       /* right rail folds away */
+}
 #opstrip{display:none}
-#demo-banner{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface2);font-family:var(--ui);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+#demo-banner{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;padding:12px 18px;border-top:1px solid rgba(23,26,32,.07);background:rgba(253,253,254,.85);font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 #demo-banner a{color:var(--accent);font-weight:700;text-decoration:none}
 </style>
 </head>
@@ -250,7 +314,7 @@ input[type=range]{accent-color:var(--accent)}
   </div>
 </div>
 
-<div id="demo-banner"><span id="demo-msg">▶ Recorded live session — real pipeline at 2 kbps: live twin → blackout → backfill (0 lost) → crash → root cause.</span>
+<div id="demo-banner"><span id="demo-msg">▶ Recorded live session — real pipeline at 2 kbps: live twin → blackout → backfill (0 lost) → crash → root cause</span>
 <a href="https://github.com/vnmoorthy/neverdrop">git clone → run it live</a></div>
 <div id="incident-overlay"><div><div id="incident-banner">⚠ INCIDENT</div><div id="incident-cause"></div></div></div>
 
@@ -321,12 +385,14 @@ function makeStrip(id, opts){
     if(hi-lo < (opts.span||0.1)){ const m=(hi+lo)/2, s=(opts.span||0.1)/2; lo=m-s; hi=m+s; }
     ctx.strokeStyle = "rgba(95,118,136,.30)"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
-    ctx.strokeStyle = opts.color; ctx.lineWidth = 1.5; ctx.beginPath();
     const n = data.length;
-    for(let i=0;i<n;i++){
-      const x = i/(n-1)*w, y = h - 3 - (data[i]-lo)/(hi-lo)*(h-6);
-      i? ctx.lineTo(x,y): ctx.moveTo(x,y);
-    }
+    const pt = i => [i/(n-1)*w, h - 3 - (data[i]-lo)/(hi-lo)*(h-6)];
+    ctx.beginPath(); ctx.moveTo(...pt(0));
+    for(let i=1;i<n;i++) ctx.lineTo(...pt(i));
+    ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+    ctx.globalAlpha = .10; ctx.fillStyle = opts.color; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = opts.color; ctx.lineWidth = 1.5; ctx.beginPath();
+    for(let i=0;i<n;i++){ const [x,y]=pt(i); i? ctx.lineTo(x,y): ctx.moveTo(x,y); }
     ctx.stroke();
     // endpoint dot
     const y = h - 3 - (data[n-1]-lo)/(hi-lo)*(h-6);
@@ -372,16 +438,24 @@ function makeTeleChart(id, pick, opts){
     ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
     if(data.length < 2) return;
     const lo = opts.min, hi = opts.max;
-    ctx.strokeStyle = opts.color; ctx.lineWidth = 1.4; ctx.beginPath();
-    let pen = false;
+    // segments split at holes; each gets a soft area fill + line
+    const segs = [[]];
     for(const p of data){
       const x = (p.t-t0)/span*w;
       const y = h - 3 - Math.max(0, Math.min(1, (pick(p)-lo)/(hi-lo)))*(h-6);
-      if(!pen){ ctx.moveTo(x,y); pen = true; }
-      else ctx.lineTo(x,y);
-      if(p._gapAfter) pen = false;      // hole in the record
+      segs[segs.length-1].push([x,y]);
+      if(p._gapAfter) segs.push([]);    // hole in the record
     }
-    ctx.stroke();
+    for(const seg of segs){
+      if(seg.length < 2) continue;
+      ctx.beginPath(); ctx.moveTo(seg[0][0], seg[0][1]);
+      for(let i=1;i<seg.length;i++) ctx.lineTo(seg[i][0], seg[i][1]);
+      ctx.lineTo(seg[seg.length-1][0], h); ctx.lineTo(seg[0][0], h); ctx.closePath();
+      ctx.globalAlpha = .10; ctx.fillStyle = opts.color; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.moveTo(seg[0][0], seg[0][1]);
+      for(let i=1;i<seg.length;i++) ctx.lineTo(seg[i][0], seg[i][1]);
+      ctx.strokeStyle = opts.color; ctx.lineWidth = 1.4; ctx.stroke();
+    }
     const last = data[data.length-1];
     const y = h - 3 - Math.max(0, Math.min(1, (pick(last)-lo)/(hi-lo)))*(h-6);
     const lx = Math.min((last.t-t0)/span*w, w-2);   // dot follows the trace
@@ -993,7 +1067,7 @@ function setState(name){
 }
 let ws = null;   // recorded session: no live socket
 const DEMO_SPEED = 2.5;
-function demoBadge(){ $("src-badge").textContent = "RECORDED SESSION \u00b7 REAL PIPELINE \u00b7 " + DEMO_SPEED + "\u00d7"; }
+function demoBadge(){ $("src-badge").textContent = "RECORDED SESSION \u00b7 " + DEMO_SPEED + "\u00d7"; }
 async function playSession(){
   const evs = await (await fetch("session.json")).json();
   demoBadge();
@@ -1004,7 +1078,7 @@ async function playSession(){
     try{ handle(ev, false); }catch(e){ console.warn("demo event", e); }
     if(ev.type === "hello") demoBadge();
   }
-  $("demo-msg").textContent = "Session complete \u2014 the crash replay above is scrubbable and loops. Clone the repo to run it live.";
+  $("demo-msg").textContent = "Session complete \u2014 the crash replay is scrubbable and loops. Clone the repo to run it live.";
 }
 playSession();
 setInterval(()=>{
