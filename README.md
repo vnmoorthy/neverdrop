@@ -1,5 +1,7 @@
 <div align="center">
 
+![NeverDrop](assets/banner.svg)
+
 # 📡 NeverDrop
 
 ### Mission control for robots beyond the cloud
@@ -7,7 +9,7 @@
 **A live 3D digital twin · loss-proof store-and-forward telemetry · a flight-recorder black box —
 all through a 2,000 bit/s satellite link. No cloud, anywhere.**
 
-[![tests](https://img.shields.io/badge/tests-ALL%20PASS-brightgreen)](test_blackbox.py)
+[![ci](https://github.com/vnmoorthy/neverdrop/actions/workflows/ci.yml/badge.svg)](https://github.com/vnmoorthy/neverdrop/actions/workflows/ci.yml)
 [![phone e2e](https://img.shields.io/badge/phone%20E2E-ALL%20PASS-brightgreen)](test_phone_e2e.py)
 [![link budget](https://img.shields.io/badge/link%20budget-2%20kbps-orange)](icebox/linksim.py)
 [![packet limit](https://img.shields.io/badge/Iridium%20SBD-340%20bytes-blue)](icebox/blackbox.py)

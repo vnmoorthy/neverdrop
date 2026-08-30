@@ -342,12 +342,16 @@ ST_HEAD = struct.Struct("<2sHdhhhhHBB")  # magic seq t quat4 amag_mg tilt nj
 ST_MAGIC = b"ST"
 
 
-def pack_state(seq: int, s: Sample) -> bytes:
+def pack_state(seq: int, s: Sample, amag_g: float | None = None) -> bytes:
+    """amag_g: peak-hold |a| since the previous frame (an 8 Hz stream would
+    otherwise sample right past a 40 ms impact spike)."""
+    if amag_g is None:
+        amag_g = _mag(s.accel)
     body = ST_HEAD.pack(
         ST_MAGIC, seq & 0xFFFF, s.t,
         _q(s.quat[0], SCALES[3]["quat"]), _q(s.quat[1], SCALES[3]["quat"]),
         _q(s.quat[2], SCALES[3]["quat"]), _q(s.quat[3], SCALES[3]["quat"]),
-        min(65535, int(_mag(s.accel) * 1000)), min(255, int(tilt_deg(s.quat))),
+        min(65535, int(amag_g * 1000)), min(255, int(tilt_deg(s.quat))),
         len(s.joints))
     if s.joints:
         body += struct.pack(f"<{len(s.joints)}h", *(_q(j, Q_JOINT) for j in s.joints))

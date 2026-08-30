@@ -40,6 +40,7 @@ class Onboard:
         self.trigger = bb.CrashTrigger()
         self.state = bb.STATE_NOMINAL
         self.stream_seq = 0
+        self._amax = 0.0                   # peak |a| since last stream frame
         self.gap_buf: list = []            # samples held during link blackout
         self.gap_id = 1000                 # id space separate from crash reports
         # continue numbering across restarts so persisted .ibx files and a
@@ -59,6 +60,9 @@ class Onboard:
         asyncio.create_task(self._stream_loop())
         async for s in self.source.stream():
             self.ring.append(s)
+            a = (s.accel[0] ** 2 + s.accel[1] ** 2 + s.accel[2] ** 2) ** 0.5
+            if a > self._amax:
+                self._amax = a          # peak-hold for the next stream frame
             cause = self.trigger.check(s)
             if cause and self.state == bb.STATE_NOMINAL:
                 asyncio.create_task(self._incident(s.t, cause))
@@ -120,7 +124,10 @@ class Onboard:
                         self.gap_buf = []
                     # live frames leapfrog any backlog (burst or backfill)
                     pri = self.link.queued > 5
-                    self.link.send(bb.pack_state(self.stream_seq, s), priority=pri)
+                    amax, self._amax = self._amax, 0.0
+                    self.link.send(bb.pack_state(self.stream_seq, s,
+                                                 amag_g=amax or None),
+                                   priority=pri)
                     self.stream_seq += 1
                 else:
                     self.gap_buf.append(s)

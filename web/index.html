@@ -801,6 +801,11 @@ function handle(ev, replayed){
         $("gforce-hud").style.display = "block";
         $("hud-g").textContent = ev.accel_g.toFixed(1);
         $("hud-g").className = "g" + (ev.accel_g > 3? " hot":"");
+        // a live crash deserves the same theater as a replayed one
+        if(ev.accel_g > 3.5 && Date.now() - (S._liveFxAt||0) > 2000){
+          S._liveFxAt = Date.now();
+          fireImpactFx();
+        }
       }
       break;
     }

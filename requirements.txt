@@ -1,1 +1,3 @@
 aiohttp>=3.9
+# optional, only for --source arm (real manipulator over Feetech serial bus):
+#   pip install feetech-servo-sdk pyserial

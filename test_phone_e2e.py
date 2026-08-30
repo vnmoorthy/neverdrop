@@ -70,7 +70,8 @@ def shove_samples():
 
 
 async def main():
-    got = {"incident": None, "segments": [], "analysis": None, "hb_states": set()}
+    got = {"incident": None, "segments": [], "analysis": None,
+           "hb_states": set(), "states": 0}
 
     async with aiohttp.ClientSession() as s:
 
@@ -78,7 +79,9 @@ async def main():
             async with s.ws_connect(BASE + "/ws") as ws:
                 async for msg in ws:
                     ev = json.loads(msg.data)
-                    if ev["type"] == "hb":
+                    if ev["type"] == "state":
+                        got["states"] += 1        # the live-twin stream
+                    elif ev["type"] == "hb":
                         got["hb_states"].add(ev["state"])
                     elif ev["type"] == "incident":
                         got["incident"] = ev["cause"]
@@ -129,6 +132,8 @@ async def main():
     assert any(t == 1 for t, _ in got["segments"]), "tier-1 segment never decoded"
     assert got["analysis"], "no root-cause analysis produced"
     assert 0 not in got["hb_states"] or len(got["hb_states"]) > 1, "state never left NOMINAL"
+    assert got["states"] > 20, f"live twin stream too thin: {got['states']} frames"
+    print(f"  live twin: {got['states']} state frames crossed the link")
     print("PHONE E2E: ALL PASS")
 
 

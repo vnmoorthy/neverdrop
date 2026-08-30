@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install aiohttp
+      - name: Unit + pipeline suite
+        run: python test_blackbox.py
+      - name: Phone-mode end to end (synthetic Sensor Logger stream)
+        run: |
+          python -m icebox.server --source phone --port 8010 &
+          sleep 2
+          python test_phone_e2e.py

@@ -1,0 +1,71 @@
+<svg width="960" height="270" viewBox="0 0 960 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NeverDrop — telemetry that never drops">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7FAFC"/>
+      <stop offset="0.7" stop-color="#EDF2F6"/>
+      <stop offset="1" stop-color="#E2EAF0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="270" fill="url(#sky)"/>
+
+  <!-- distant whiteout peaks -->
+  <polygon points="540,270 660,80 780,270" fill="#D9E4EC"/>
+  <polygon points="640,270 790,40 940,270" fill="#CBD9E3"/>
+  <polygon points="760,270 870,110 980,270" fill="#D9E4EC"/>
+  <polygon points="470,270 560,150 650,270" fill="#E1EAF0"/>
+
+  <!-- ice grid -->
+  <g stroke="#C9D8E2" stroke-width="1" opacity="0.7">
+    <line x1="0" y1="238" x2="960" y2="238"/>
+    <line x1="0" y1="252" x2="960" y2="252"/>
+    <line x1="0" y1="266" x2="960" y2="266"/>
+  </g>
+
+  <!-- satellite dish (base camp) -->
+  <g transform="translate(505,196)">
+    <path d="M0,22 A22,22 0 0 1 22,0 L22,22 Z" fill="#2B3947"/>
+    <rect x="18" y="20" width="5" height="22" fill="#2B3947"/>
+    <rect x="10" y="40" width="22" height="4" fill="#18232E"/>
+  </g>
+
+  <!-- signal dots: robot -> dish, one gap being closed -->
+  <g fill="#E63B23">
+    <circle cx="560" cy="192" r="3.2"/>
+    <circle cx="592" cy="180" r="3.2"/>
+    <circle cx="624" cy="170" r="3.2"/>
+    <circle cx="688" cy="158" r="3.2" fill="#0E8F63"/>
+    <circle cx="720" cy="156" r="3.2"/>
+    <circle cx="752" cy="158" r="3.2"/>
+  </g>
+  <text x="656" y="150" font-family="Menlo, Consolas, monospace" font-size="11" fill="#0E8F63" text-anchor="middle">gap closed</text>
+  <text x="656" y="196" font-family="Menlo, Consolas, monospace" font-size="12" fill="#5F7688" text-anchor="middle">2,000 bit/s</text>
+
+  <!-- robot -->
+  <g transform="translate(790,150)">
+    <rect x="10" y="0" width="26" height="18" fill="#E63B23"/>
+    <rect x="30" y="5" width="9" height="6" fill="#18232E"/>
+    <rect x="4" y="20" width="38" height="44" fill="#2B3947"/>
+    <rect x="-6" y="22" width="9" height="30" fill="#18232E"/>
+    <rect x="43" y="22" width="9" height="30" fill="#18232E"/>
+    <rect x="8" y="66" width="12" height="38" fill="#2B3947"/>
+    <rect x="26" y="66" width="12" height="38" fill="#2B3947"/>
+    <rect x="4" y="104" width="18" height="9" fill="#E63B23"/>
+    <rect x="24" y="104" width="18" height="9" fill="#E63B23"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="56" y="112" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="64" letter-spacing="1" fill="#15222D">NEVER<tspan fill="#E63B23">DROP</tspan></text>
+  <text x="60" y="144" font-family="Menlo, Consolas, monospace" font-size="14" letter-spacing="4" fill="#5F7688">TELEMETRY THAT NEVER DROPS</text>
+
+  <!-- feature chips -->
+  <g font-family="Menlo, Consolas, monospace" font-size="12.5">
+    <rect x="58" y="170" width="102" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
+    <text x="109" y="189" text-anchor="middle" fill="#1F6E93">LIVE TWIN</text>
+    <rect x="170" y="170" width="152" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
+    <text x="246" y="189" text-anchor="middle" fill="#0E8F63">STORE &amp; FORWARD</text>
+    <rect x="332" y="170" width="108" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
+    <text x="386" y="189" text-anchor="middle" fill="#E63B23">BLACK BOX</text>
+  </g>
+  <text x="60" y="228" font-family="Menlo, Consolas, monospace" font-size="12" fill="#5F7688">mission control for robots beyond the cloud · built for Robot Everest</text>
+</svg>
