@@ -187,6 +187,16 @@ input[type=range]{width:110px}
 #blackout .bo-sub{font-family:var(--ui);letter-spacing:.16em;text-transform:uppercase;font-size:10.5px}
 #recovered{border-radius:99px;font-family:var(--ui);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase}
 
+#geo{position:absolute;left:14px;bottom:12px;display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(23,26,32,.08);border-radius:99px;padding:6px 14px;
+  font-family:var(--mono);font-size:11px;color:var(--ink)}
+#geo .dot{width:7px;height:7px;border-radius:99px;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(232,33,39,.18);flex:none}
+#geo #geo-name{font-family:var(--ui);font-size:8.5px;font-weight:700;letter-spacing:.18em;color:var(--muted)}
+#terrain-credit{position:absolute;right:14px;bottom:12px;font-family:var(--ui);
+  font-size:8px;font-weight:600;letter-spacing:.16em;color:var(--muted);opacity:.75}
+
 /* responsive: keep composition at any width */
 #main{grid-template-columns:minmax(250px,330px) minmax(340px,1fr) minmax(230px,320px)}
 #replay-badges{max-width:calc(100% - 140px);flex-wrap:wrap}
@@ -250,6 +260,8 @@ input[type=range]{width:110px}
         <div id="impact-flash"></div>
         <div id="blackout"><div class="bo-title">⚠ LINK BLACKOUT</div><div class="bo-sub">STORE &amp; FORWARD — buffering onboard · <span id="bo-count">0</span> samples held</div></div>
         <div id="recovered"><span id="recovered-text">▲ BACKFILLED</span></div>
+        <div id="geo"><span class="dot"></span><span id="geo-coords">—</span><span id="geo-name">ACQUIRING FIX</span></div>
+        <div id="terrain-credit"></div>
       </div>
       <div id="transport">
         <canvas id="spark"></canvas>
@@ -522,9 +534,9 @@ view.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xE4EDF3);
 scene.fog = new THREE.Fog(0xE4EDF3, 10, 34);
-const camera = new THREE.PerspectiveCamera(42, 1, .1, 200);
-camera.position.set(3.4, 2.1, 4.6);
-camera.lookAt(0, 0.7, 0);
+const camera = new THREE.PerspectiveCamera(52, 1, .1, 400);
+camera.position.set(4.6, 2.4, 5.4);
+camera.lookAt(0, 2.4, 0);
 scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c9d6, 0.9));
 const key = new THREE.DirectionalLight(0xffffff, 0.85); key.position.set(4,7,3);
 key.castShadow = true;
@@ -535,25 +547,59 @@ key.shadow.bias = -0.0015;
 scene.add(key);
 const rim = new THREE.DirectionalLight(0xcfe4f0, 0.35); rim.position.set(-5,3,-6); scene.add(rim);
 
-// distant massif: two rings of low-poly peaks fading into the fog
-(function(){
-  const far = new THREE.MeshStandardMaterial({color:0xC5D4DF, roughness:1, metalness:0, flatShading:true});
-  const near = new THREE.MeshStandardMaterial({color:0xD4E1EA, roughness:.9, metalness:0, flatShading:true});
-  let seed = 42; const rnd = ()=> (seed = (seed*9301+49297)%233280)/233280;
-  for(let i=0;i<16;i++){
-    const a = i/16*Math.PI*2 + rnd()*0.3;
-    const r = 26 + rnd()*8, h = 7+rnd()*9;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(4+rnd()*5, h, 5), far);
-    m.position.set(Math.cos(a)*r, h/2-0.4, Math.sin(a)*r);
-    m.rotation.y = rnd()*Math.PI; scene.add(m);
-  }
-  for(let i=0;i<10;i++){
-    const a = i/10*Math.PI*2 + 0.31 + rnd()*0.4;
-    const r = 16 + rnd()*5, h = 2.5+rnd()*3.5;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(1.6+rnd()*2.4, h, 5), near);
-    m.position.set(Math.cos(a)*r, h/2-0.3, Math.sin(a)*r);
-    m.rotation.y = rnd()*Math.PI; scene.add(m);
-  }
+// THE REAL HIMALAYA: SRTM-derived elevation of the Everest massif (26 km
+// patch, Mapzen terrarium tiles), geo-anchored so the world origin — where
+// the robot walks — sits at Everest Base Camp. 1 unit = 100 m, relief 1:1.
+const GEO = { lat: 28.0026, lon: 86.8528, alt: 5364, name: "EVEREST BASE CAMP · KHUMBU" };
+(async function buildHimalaya(){
+  try{
+    const T = await (await fetch("terrain.json")).json();
+    const bin = atob(T.elev_b64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    const elev = new Uint16Array(bytes.buffer);
+    const N = T.size, U = T.span_m / 100;         // world units (100 m each)
+    // grid-center -> EBC offset in meters (east, north)
+    const mE = (GEO.lon - T.center[1]) * 111320 * Math.cos(GEO.lat * Math.PI/180);
+    const mN = (GEO.lat - T.center[0]) * 111320;
+    const ox = -mE / 100, oz = mN / 100;          // translate so EBC = origin
+    const geo = new THREE.PlaneGeometry(U, U, N-1, N-1);
+    geo.rotateX(-Math.PI/2);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const rock = new THREE.Color(0x55636F), snow = new THREE.Color(0xF7FAFC);
+    const c = new THREE.Color();
+    const cell = T.span_m / N;                    // meters per grid cell
+    const E = (i,j)=> elev[Math.max(0,Math.min(N-1,j))*N + Math.max(0,Math.min(N-1,i))];
+    for(let vi=0; vi<pos.count; vi++){
+      const i = vi % N, j = Math.floor(vi / N);
+      const m = E(i,j);
+      const wx = pos.getX(vi) + ox, wz = pos.getZ(vi) + oz;
+      let h = (m - GEO.alt) / 100;                // authentic 1:1 relief
+      const d = Math.hypot(wx, wz);
+      const blend = Math.min(1, Math.max(0, (d - 22) / 26));  // flat glacier basin
+      h = Math.max(-2, h) * blend;
+      pos.setY(vi, h);
+      // snow holds on gentle high ground; steep faces show rock — like the real wall
+      const slope = Math.max(Math.abs(E(i+1,j)-m), Math.abs(E(i,j+1)-m)) / cell;
+      const steep = Math.min(1, Math.max(0, (slope - 0.45) / 0.55));
+      const alt = Math.min(1, Math.max(0, (m - 5200) / 900));
+      const t = Math.max(0.06, alt * (1 - steep * 0.9));
+      c.copy(rock).lerp(snow, t);
+      const shade = 0.8 + 0.2 * alt;              // valley air darkens low ground
+      colors[vi*3] = c.r*shade; colors[vi*3+1] = c.g*shade; colors[vi*3+2] = c.b*shade;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.translate(ox, 0, oz);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, flatShading: true, roughness: .92, metalness: .02 }));
+    scene.add(mesh);
+    scene.background = new THREE.Color(0xC7DBEA);  // high-altitude sky
+    scene.fog = new THREE.Fog(0xC7DBEA, 40, 340);  // aerial perspective to the massif
+    const credit = $("terrain-credit");
+    if(credit) credit.textContent = "TERRAIN · REAL SRTM ELEVATION · " + Math.round(T.span_m/1000) + " KM · RELIEF 1:1";
+  }catch(e){ console.warn("terrain unavailable, keeping whiteout", e); }
 })();
 
 // falling snow
@@ -746,9 +792,9 @@ function tick(ts){
   const cz = (S.view==="live" && S.pose && S.pose.pos)? -S.pose.pos[1] : 0;
   S._camx = (S._camx===undefined)? cx : S._camx + (cx-S._camx)*.04;   // smooth follow
   S._camz = (S._camz===undefined)? cz : S._camz + (cz-S._camz)*.04;
-  camera.position.x = S._camx + Math.cos(t*.08)*4.4;
-  camera.position.z = S._camz + Math.sin(t*.08)*4.4;
-  camera.position.y = 2.0;
+  camera.position.x = S._camx + Math.cos(t*.08)*7.0;
+  camera.position.z = S._camz + Math.sin(t*.08)*7.0;
+  camera.position.y = 2.5;
   if(fx > 0.01){
     camera.position.x += (Math.random()-.5)*fx*.16;
     camera.position.y += (Math.random()-.5)*fx*.16;
@@ -760,7 +806,7 @@ function tick(ts){
   } else if(impactLight.intensity > 0){
     impactLight.intensity = 0; impactRing.material.opacity = 0;
   }
-  camera.lookAt(S._camx||0,.6,S._camz||0);
+  camera.lookAt(S._camx||0, 2.9, S._camz||0);   // robot low in frame, massif fills the sky
   // live twin: latest streamed pose drives the robot directly
   if(S.view === "live" && S.pose){
     if(S.pose.pos){
@@ -1107,6 +1153,13 @@ setInterval(()=>{
   }
   if(S.tele.length) drawTele();
   if(S.view === "live") updateBadges();
+  // GPS fix: base-camp anchor + the position that crossed the link
+  if(S.pose && S.pose.pos){
+    const lat = GEO.lat + S.pose.pos[1] / 111320;
+    const lon = GEO.lon + S.pose.pos[0] / (111320 * Math.cos(lat * Math.PI/180));
+    $("geo-coords").textContent = lat.toFixed(5) + "° N · " + lon.toFixed(5) + "° E · " + GEO.alt.toLocaleString() + " m";
+    $("geo-name").textContent = GEO.name;
+  }
 }, 400);
 $("sl-bps").oninput = e=>{ $("o-bps").textContent=e.target.value+" bps"; send({cmd:"link",bps:+e.target.value}); };
 $("sl-loss").oninput = e=>{ $("o-loss").textContent=e.target.value+"% loss"; send({cmd:"link",loss:e.target.value/100}); };
