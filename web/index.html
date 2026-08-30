@@ -354,7 +354,11 @@ function makeTeleChart(id, pick, opts){
     if(cv.width !== w*dpr){ cv.width = w*dpr; cv.height = h*dpr; }
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,w,h);
-    const now = (S.tele.length? S.tele[S.tele.length-1].t : 0);
+    // extend the axis by receive-side elapsed time so a blackout TEARS a
+    // growing hole instead of freezing the chart (clock-skew safe: only
+    // local elapsed is added to the frame-time axis)
+    const lastT = S.tele.length? S.tele[S.tele.length-1].t : 0;
+    const now = S.tele.length? lastT + Math.max(0, (Date.now()-S.lastStateRx)/1000 - 0.5) : 0;
     const span = 75, t0 = now - span;
     const data = S.tele.filter(p=>p.t >= t0);
     ctx.strokeStyle = "rgba(95,118,136,.30)"; ctx.lineWidth = 1;
@@ -373,14 +377,15 @@ function makeTeleChart(id, pick, opts){
     ctx.stroke();
     const last = data[data.length-1];
     const y = h - 3 - Math.max(0, Math.min(1, (pick(last)-lo)/(hi-lo)))*(h-6);
-    ctx.fillStyle = opts.color; ctx.beginPath(); ctx.arc(w-2,y,2.5,0,7); ctx.fill();
+    const lx = Math.min((last.t-t0)/span*w, w-2);   // dot follows the trace
+    ctx.fillStyle = opts.color; ctx.beginPath(); ctx.arc(lx,y,2.5,0,7); ctx.fill();
   };
 }
 const teleAccel = makeTeleChart("c-accel", p=>p.a,    {color:"#E63B23", min:0, max:3});
 const teleTilt  = makeTeleChart("c-tilt",  p=>p.tilt, {color:"#1F6E93", min:0, max:120});
 function markGaps(){
   for(let i=0;i<S.tele.length-1;i++)
-    S.tele[i]._gapAfter = (S.tele[i+1].t - S.tele[i].t) > 1.2;
+    S.tele[i]._gapAfter = (S.tele[i+1].t - S.tele[i].t) > 3.0;  // >3s: phone push jitter never tears false holes
   if(S.tele.length) S.tele[S.tele.length-1]._gapAfter = false;
 }
 function drawTele(){
@@ -792,9 +797,15 @@ function handle(ev, replayed){
     case "hello": S.sourceName = ev.source; $("src-badge").textContent = "SOURCE: "+ev.source.toUpperCase(); break;
     case "state": {
       S.liveCount++;
-      S.pose = {quat: ev.quat, joints: ev.joints||[]};
+      if(ev.t >= (S._lastPoseT||0)){       // stale frame after restore: skip pose
+        S._lastPoseT = ev.t;
+        S.pose = {quat: ev.quat, joints: ev.joints||[]};
+      }
       S.lastStateRx = Date.now();
       S.tele.push({t: ev.t, a: ev.accel_g, tilt: ev.tilt});
+      const tn = S.tele.length;
+      if(tn > 1 && S.tele[tn-1].t < S.tele[tn-2].t)   // out-of-order arrival
+        S.tele.sort((a,b)=>a.t-b.t);
       if(S.tele.length > 1600) S.tele.splice(0, 400);
       if(S.view === "live"){
         $("replay-empty").style.display = "none";
@@ -834,8 +845,11 @@ function handle(ev, replayed){
       S.lastHb = Date.now();
       const name = ["NOMINAL","INCIDENT","TRANSMITTING","DELIVERED"][ev.state]||"NOMINAL";
       // the banner fires ONLY from the state bit that crossed the link
-      // (lastHbState===null guards a dashboard opened mid-incident)
-      if((name==="INCIDENT"||name==="TRANSMITTING") && S.lastHbState==="NOMINAL" && !replayed)
+      // (lastHbState===null guards a dashboard opened mid-incident);
+      // any transition INTO INCIDENT fires, so a second fall that
+      // supersedes a draining burst still gets its klaxon
+      if(!replayed && S.lastHbState && S.lastHbState!==name &&
+         (name==="INCIDENT" || (name==="TRANSMITTING" && S.lastHbState==="NOMINAL")))
         incidentFx(S.pendingCause||null);
       S.lastHbState = name;
       setState(name);
@@ -848,6 +862,7 @@ function handle(ev, replayed){
       $("queue").textContent = ev.queued;
       $("buffered").textContent = ev.buffered_s+" s";
       $("rate").textContent = ev.rate_hz+" Hz";
+      S.gapHeld = ev.gap_held;
       if(S.linkUp !== ev.up){
         S.linkUp = ev.up;
         updateLinkBtn();
@@ -879,8 +894,11 @@ function handle(ev, replayed){
         R.loopStart = R.loopStart*scale;
         loadSegment(ev); applyFrame(Math.min(keep, ev.n-1));
       }
-      else if(replayed && !R.seg){
-        S.currentReport = ev.report; loadSegment(ev); applyFrame(0);
+      else if(replayed){
+        // history replay: track each report in turn so a refreshed
+        // dashboard ends on the LATEST incident, not the first
+        S.currentReport = ev.report;
+        loadSegment(rep.segments[2] || rep.segments[1]); applyFrame(0);
       }
       renderLog(); break;
     }
@@ -923,7 +941,8 @@ $("btn-linkup").onclick = ()=> send({cmd:"link", up: !S.linkUp});
 // blackout counter + rolling chart/badge refresh
 setInterval(()=>{
   if(!S.linkUp && S.blackoutStart){
-    const held = Math.round((Date.now()-S.blackoutStart)/1000 * 8);
+    const held = (S.gapHeld != null) ? S.gapHeld
+               : Math.round((Date.now()-S.blackoutStart)/1000 * 8);
     $("bo-count").textContent = held;
   }
   if(S.tele.length) drawTele();

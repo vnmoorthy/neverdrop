@@ -64,7 +64,9 @@ class Onboard:
             if a > self._amax:
                 self._amax = a          # peak-hold for the next stream frame
             cause = self.trigger.check(s)
-            if cause and self.state == bb.STATE_NOMINAL:
+            # a new incident may supersede a still-draining burst (flush_lo
+            # abandons it); only the 2.2 s capture window itself is exclusive
+            if cause and self.state != bb.STATE_INCIDENT:
                 asyncio.create_task(self._incident(s.t, cause))
 
     async def _incident(self, t: float, cause: str):
@@ -100,6 +102,8 @@ class Onboard:
     async def _await_drain(self, rid: int):
         while self.link.queued > 0:
             await asyncio.sleep(0.2)
+        if self.state != bb.STATE_TRANSMITTING:
+            return                      # a newer incident took over
         self.state = bb.STATE_DELIVERED
         await asyncio.sleep(3.0)
         if self.state == bb.STATE_DELIVERED:
@@ -115,12 +119,15 @@ class Onboard:
             s = self.ring.latest
             if s is not None:
                 if self.link.up:
-                    if not was_up and len(self.gap_buf) >= 4:
-                        self.gap_id += 1
-                        seg = bb.encode_segment(bb.decimate(self.gap_buf, 12.5),
-                                                tier=3, report_id=self.gap_id)
-                        for p in bb.packetize(seg, self.gap_id, 3):
-                            self.link.send(p, priority=False)
+                    if not was_up:
+                        if len(self.gap_buf) >= 4:
+                            self.gap_id += 1
+                            seg = bb.encode_segment(bb.decimate(self.gap_buf, 12.5),
+                                                    tier=3, report_id=self.gap_id)
+                            for p in bb.packetize(seg, self.gap_id, 3):
+                                self.link.send(p, priority=False)
+                        # ALWAYS clear on restore: stale samples from a short
+                        # blip must never poison the next blackout's backfill
                         self.gap_buf = []
                     # live frames leapfrog any backlog (burst or backfill)
                     pri = self.link.queued > 5
@@ -325,6 +332,7 @@ async def main():
                 "rate_hz": round(onboard.ring.rate_hz(), 1),
                 "buffered_s": round(len(onboard.ring.buf) /
                                     max(1.0, onboard.ring.rate_hz()), 1),
+                "gap_held": len(onboard.gap_buf),
                 "source": args.source,
                 "have_data": latest is not None,
                 "armed": onboard.trigger.st.armed})

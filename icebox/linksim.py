@@ -55,11 +55,17 @@ class SatLink:
         return self._q_hi.qsize() + self._q_lo.qsize()
 
     def flush_lo(self):
-        """Abandon any queued burst packets (a newer incident supersedes them)."""
-        n = 0
+        """Abandon queued tier-1/2 burst packets (a newer incident supersedes
+        them); live 'ST' frames and tier-3 gap backfill survive the flush."""
+        keep, n = [], 0
         while not self._q_lo.empty():
-            self._q_lo.get_nowait()
-            n += 1
+            p = self._q_lo.get_nowait()
+            if p[:2] == b"SB" and len(p) > 4 and p[4] != 3:
+                n += 1                  # superseded burst packet: drop
+            else:
+                keep.append(p)          # live frame or gap backfill: keep
+        for p in keep:
+            self._q_lo.put_nowait(p)
         return n
 
     def kbps_now(self) -> float:
