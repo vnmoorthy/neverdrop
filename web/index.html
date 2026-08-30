@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeverDrop · Mission Control</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  /* glacier-light: ice-white instrument, one signal color (black-box orange-red),
+     steel blue for data, deep slate ink */
+  --ground:#EDF2F6; --surface:#FBFDFE; --surface2:#F2F6F9; --line:#D3DEE7;
+  --ink:#15222D; --muted:#5F7688; --accent:#E63B23; --ice:#1F6E93;
+  --good:#0E8F63; --warn:#B26A05; --bad:#D42B1E;
+  --disp:'Big Shoulders Display','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font-family:var(--mono);font-size:13px;overflow:hidden;
+  background:linear-gradient(180deg, #F6F9FB 0%, var(--ground) 60%, #E2EAF0 100%)}
+button{font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:6px 12px;cursor:pointer;letter-spacing:.06em;box-shadow:0 1px 2px rgba(21,34,45,.06)}
+button:hover{border-color:var(--ice);color:var(--ice)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;box-shadow:0 2px 10px rgba(230,59,35,.35)}
+button.primary:hover{color:#fff;filter:brightness(1.07)}
+button.toggled{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.toggled:hover{color:#fff}
+input[type=range]{accent-color:var(--accent)}
+
+#app{display:flex;flex-direction:column;height:100%}
+
+/* ---------- top bar ---------- */
+#topbar{display:flex;align-items:center;gap:18px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--surface2);flex:none}
+.wordmark{font-family:var(--disp);font-weight:800;font-size:26px;letter-spacing:.04em;color:var(--ink)}
+.wordmark b{color:var(--accent)}
+.wordsub{font-size:10px;letter-spacing:.28em;color:var(--muted);margin-top:-3px}
+.pill{font-weight:600;letter-spacing:.12em;padding:6px 14px;border:1.5px solid var(--line);font-size:13px;background:var(--surface);transition:box-shadow .3s}
+.pill.NOMINAL{color:var(--good);border-color:var(--good)}
+.pill.INCIDENT{color:#fff;background:var(--bad);border-color:var(--bad);animation:blink .5s steps(2) infinite;box-shadow:0 2px 18px rgba(212,43,30,.45)}
+.pill.TRANSMITTING{color:var(--warn);border-color:var(--warn)}
+.pill.DELIVERED{color:var(--ice);border-color:var(--ice)}
+@keyframes blink{50%{opacity:.55}}
+.tb-item{display:flex;flex-direction:column;gap:2px;min-width:86px}
+.tb-item .k{font-size:9.5px;letter-spacing:.18em;color:var(--muted)}
+.tb-item .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.tb-item .v.hot{color:var(--accent)}
+#linkbar{width:120px;height:8px;background:var(--surface);border:1px solid var(--line);position:relative}
+#linkbar i{position:absolute;inset:0;transform-origin:left;background:var(--ice);display:block}
+#spacer{flex:1}
+.srcbadge{color:var(--ice);border:1px dashed var(--ice);padding:5px 10px;font-size:11px;letter-spacing:.14em}
+
+/* ---------- main grid ---------- */
+#main{display:grid;grid-template-columns:340px 1fr 330px;flex:1;min-height:0}
+.col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+.col:last-child{border-right:none}
+.panel{padding:12px 14px;border-bottom:1px solid var(--line)}
+.panel h2{font-size:10px;letter-spacing:.22em;color:var(--ice);margin:0 0 10px;font-weight:600}
+.panel h2 .sub{color:var(--muted);letter-spacing:.06em;text-transform:none;float:right}
+
+/* heartbeat strips */
+.strip{margin-bottom:10px}
+.strip .lab{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:3px}
+.strip .lab b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.strip canvas{width:100%;height:34px;display:block;background:var(--surface2);border:1px solid var(--line)}
+
+/* packet wall */
+#pktwall{display:flex;flex-direction:column;gap:10px}
+.tier-row .lab{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:4px}
+.tier-row .lab b{color:var(--ink)}
+.blocks{display:flex;flex-wrap:wrap;gap:2px}
+.blk{width:9px;height:9px;background:var(--surface);border:1px solid var(--line)}
+.blk.t1.on{background:var(--accent);border-color:var(--accent)}
+.blk.t2.on{background:var(--ice);border-color:var(--ice)}
+.blk.bad{background:var(--bad);border-color:var(--bad)}
+@keyframes pop{0%{transform:scale(1.9)}100%{transform:scale(1)}}
+.blk.on{animation:pop .25s ease-out}
+
+/* replay center */
+#center{display:flex;flex-direction:column;min-height:0}
+#view3d{flex:1;position:relative;min-height:0;background:var(--surface2);overflow:hidden}
+#view3d canvas{display:block;width:100%;height:100%}
+#view3d::after{content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 70px 12px rgba(150,175,195,.28)}
+#impact-flash{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(60% 60% at 50% 55%, rgba(230,59,35,.42), rgba(230,59,35,0) 70%);
+  transition:opacity .08s}
+#blackout{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:12%;
+  background:rgba(237,242,246,.55);backdrop-filter:blur(1.5px);pointer-events:none}
+#blackout .bo-title{font-family:var(--disp);font-weight:800;font-size:42px;letter-spacing:.05em;color:var(--bad);animation:blink 1s steps(2) infinite}
+#blackout .bo-sub{font-size:12px;letter-spacing:.14em;color:var(--ink);margin-top:8px}
+#blackout .bo-sub span{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+#recovered{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:none;
+  background:var(--good);color:#fff;font-weight:600;letter-spacing:.1em;font-size:12.5px;
+  padding:8px 16px;box-shadow:0 4px 18px rgba(14,143,99,.4)}
+#replay-badges{position:absolute;top:10px;left:12px;display:flex;gap:8px;align-items:center}
+.badge{font-size:10px;letter-spacing:.16em;padding:4px 8px;border:1px solid var(--line);background:rgba(255,255,255,.88);color:var(--muted)}
+.badge.q1{color:var(--accent);border-color:var(--accent)}
+.badge.q2{color:var(--ice);border-color:var(--ice)}
+#replay-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);letter-spacing:.14em;font-size:12px;text-align:center}
+#replay-empty .big{font-family:var(--disp);font-size:34px;font-weight:700;color:var(--line);letter-spacing:.06em;animation:breathe 3s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+#gforce-hud{position:absolute;top:10px;right:12px;text-align:right}
+#gforce-hud .g{font-family:var(--disp);font-size:54px;font-weight:800;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;transition:color .1s}
+#gforce-hud .g.hot{color:var(--bad);text-shadow:0 0 22px rgba(212,43,30,.45)}
+#gforce-hud .k{font-size:9px;letter-spacing:.2em;color:var(--muted)}
+#transport{flex:none;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface2)}
+#spark{width:100%;height:52px;display:block;background:var(--ground);border:1px solid var(--line);cursor:crosshair}
+#transport .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+#scrub{flex:1}
+#tlabel{min-width:130px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+
+/* analysis */
+#analysis .sum{font-size:13px;line-height:1.6;color:var(--ink)}
+#analysis .metrics{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{border:1px solid var(--line);padding:4px 8px;font-size:11px;color:var(--muted)}
+.chip b{color:var(--ink);font-variant-numeric:tabular-nums}
+.chip.hot b{color:var(--accent)}
+#incident-log .item{padding:8px 10px;border:1px solid var(--line);margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+#incident-log .item:hover,#incident-log .item.sel{border-color:var(--accent)}
+#incident-log .item .id{color:var(--accent);font-weight:600}
+#incident-log .item .c{color:var(--muted);font-size:11px;flex:1}
+#incident-log .empty{color:var(--muted);font-size:11px;letter-spacing:.1em}
+
+/* op strip */
+#opstrip{flex:none;display:flex;align-items:center;gap:14px;padding:10px 18px;border-top:1px solid var(--line);background:var(--surface2);flex-wrap:wrap}
+.op-group{display:flex;align-items:center;gap:8px}
+.op-group .k{font-size:9.5px;letter-spacing:.16em;color:var(--muted)}
+.op-group output{font-variant-numeric:tabular-nums;min-width:64px;font-size:11px}
+
+/* incident overlay */
+#incident-overlay{position:fixed;inset:0;background:rgba(255,45,45,.16);display:none;align-items:flex-start;justify-content:center;pointer-events:none;z-index:50;padding-top:12vh}
+#incident-overlay.on{display:flex;animation:flash .5s steps(2) 9}
+@keyframes flash{50%{background:rgba(255,45,45,.34)}}
+#incident-banner{font-family:var(--disp);font-weight:800;font-size:64px;letter-spacing:.06em;color:#fff;background:var(--bad);padding:10px 42px 16px;box-shadow:0 20px 80px rgba(0,0,0,.5)}
+#incident-cause{text-align:center;color:#fff;font-size:14px;letter-spacing:.12em;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+@media (prefers-reduced-motion: reduce){.pill.INCIDENT,#incident-overlay.on,.blk.on,#replay-empty .big{animation:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div><div class="wordmark">NEVER<b>DROP</b></div><div class="wordsub">TELEMETRY THAT NEVER DROPS</div></div>
+    <div class="pill NOMINAL" id="state-pill">NOMINAL</div>
+    <div class="tb-item"><span class="k">SAT LINK</span><span class="v" id="kbps">0.00 kbps</span><div id="linkbar"><i style="transform:scaleX(0)"></i></div></div>
+    <div class="tb-item"><span class="k">HEARTBEAT</span><span class="v" id="hb-age">—</span></div>
+    <div class="tb-item"><span class="k">ONBOARD BUFFER</span><span class="v" id="buffered">—</span></div>
+    <div class="tb-item"><span class="k">SAMPLE RATE</span><span class="v" id="rate">—</span></div>
+    <div class="tb-item"><span class="k">TX QUEUE</span><span class="v" id="queue">0</span></div>
+    <div id="spacer"></div>
+    <div class="srcbadge" id="src-badge">SOURCE: —</div>
+    <div class="tb-item"><span class="k">NO CLOUD</span><span class="v hot">2 KBPS ONLY</span></div>
+  </div>
+
+  <div id="main">
+    <!-- left column -->
+    <div class="col">
+      <div class="panel">
+        <h2>TELEMETRY · LIVE 8 HZ + HB 1 HZ <span class="sub" id="hb-bytes">— B each</span></h2>
+        <div class="strip"><div class="lab"><span>ACCEL |a|</span><b id="v-accel">—</b></div><canvas id="c-accel"></canvas></div>
+        <div class="strip"><div class="lab"><span>TILT</span><b id="v-tilt">—</b></div><canvas id="c-tilt"></canvas></div>
+        <div class="strip"><div class="lab"><span>BATTERY</span><b id="v-vbatt">—</b></div><canvas id="c-vbatt"></canvas></div>
+        <div class="strip"><div class="lab"><span>TEMP</span><b id="v-temp">—</b></div><canvas id="c-temp"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>BLACK BOX · 340-BYTE SBD PACKETS</h2>
+        <div id="pktwall">
+          <div class="tier-row" id="row-t1"><div class="lab"><span>TIER 1 · PREVIEW 25 HZ</span><b id="lab-t1">—</b></div><div class="blocks" id="blocks-t1"></div></div>
+          <div class="tier-row" id="row-t2"><div class="lab"><span>TIER 2 · FULL RATE</span><b id="lab-t2">—</b></div><div class="blocks" id="blocks-t2"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- center: 3D replay -->
+    <div id="center" class="col">
+      <div id="view3d">
+        <div id="replay-empty"><div class="big">ACQUIRING TELEMETRY</div><div>the live twin appears when the first state frame crosses the link</div></div>
+        <div id="replay-badges"></div>
+        <div id="gforce-hud" style="display:none"><div class="g" id="hud-g">1.0</div><div class="k">G-FORCE</div></div>
+        <div id="impact-flash"></div>
+        <div id="blackout"><div class="bo-title">⚠ LINK BLACKOUT</div><div class="bo-sub">STORE &amp; FORWARD — buffering onboard · <span id="bo-count">0</span> samples held</div></div>
+        <div id="recovered"><span id="recovered-text">▲ BACKFILLED</span></div>
+      </div>
+      <div id="transport">
+        <canvas id="spark"></canvas>
+        <div class="row">
+          <button id="btn-live" class="toggled">◉ LIVE</button>
+          <button id="btn-play">▶ PLAY</button>
+          <button id="btn-loop">LOOP</button>
+          <button data-speed="0.25" class="spd">¼×</button>
+          <button data-speed="0.5" class="spd toggled">½×</button>
+          <button data-speed="1" class="spd">1×</button>
+          <input type="range" id="scrub" min="0" max="1000" value="0">
+          <span id="tlabel">t = —</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- right column -->
+    <div class="col">
+      <div class="panel" id="analysis">
+        <h2>ROOT CAUSE · COMPUTED FROM TRANSMITTED DATA</h2>
+        <div class="sum" id="analysis-sum">No incident analyzed yet.</div>
+        <div class="metrics" id="analysis-metrics"></div>
+      </div>
+      <div class="panel">
+        <h2>INCIDENT LOG</h2>
+        <div id="incident-log"><div class="empty">— none —</div></div>
+      </div>
+      <div class="panel">
+        <h2>WHY THIS MATTERS</h2>
+        <div style="color:var(--muted);font-size:11.5px;line-height:1.7">
+          The expedition robot leaves for Everest <b style="color:var(--ink)">Sept 5</b>.
+          Above 8,000 m the only connection is ~2 kbps of Iridium — video
+          needs <b style="color:var(--ink)">1,000× more</b>. NeverDrop streams a
+          <b style="color:var(--ice)">live digital twin</b> through that soda
+          straw, survives blackouts with onboard store &amp; forward,
+          <b style="color:var(--good)">backfills every missing sample</b>, and
+          when the robot crashes its built-in black box bursts the last 10 s
+          home as a 3D reconstruction with a
+          <b style="color:var(--accent)">root cause</b>. Every byte here
+          crossed a real rate-limited link as framed 340-byte packets.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="opstrip">
+    <div class="op-group"><span class="k">LINK</span>
+      <button id="btn-linkup" class="primary">✂ CUT THE LINK</button>
+      <input type="range" id="sl-bps" min="300" max="9600" step="100" value="2000"><output id="o-bps">2000 bps</output>
+      <input type="range" id="sl-loss" min="0" max="50" step="5" value="0"><output id="o-loss">0% loss</output>
+    </div>
+    <div class="op-group"><span class="k">BLACK BOX</span>
+      <button id="btn-fall">⚠ TRIGGER FALL</button>
+      <button id="btn-reset">RESET ROBOT</button>
+      <button id="btn-armed" class="toggled">TRIGGER ARMED</button>
+    </div>
+    <div class="op-group"><span class="k">BACKUP</span>
+      <button id="btn-export">EXPORT</button>
+      <button id="btn-import">LOAD</button>
+      <input type="file" id="file-import" accept=".json" style="display:none">
+    </div>
+  </div>
+</div>
+
+<div id="incident-overlay"><div><div id="incident-banner">⚠ INCIDENT</div><div id="incident-cause"></div></div></div>
+
+<script src="/static/vendor/three.min.js"></script>
+<script>
+"use strict";
+/* ============================== state ============================== */
+const S = {
+  reports: {},            // id -> {segments:{1,2}, analysis, packets:{1:{got,total},2:{}}, cause, t}
+  currentReport: null,
+  activeBurst: null,      // report id whose packets own the wall
+  hb: [],                 // heartbeat history
+  lastHb: 0,
+  lastHbState: null,      // link-derived state; null until first live hb
+  tele: [],               // live+backfilled {t, a, tilt} for the stream charts
+  pose: null,             // latest streamed pose {quat, joints}
+  lastStateRx: 0,
+  view: "live",           // 'live' twin | 'replay' of an incident
+  linkUp: true,
+  blackoutStart: null,
+  liveCount: 0, backfilled: 0,
+  state: "NOMINAL",
+  events: [],             // full event log for backup export
+  sourceName: "—",
+  nJoints: 0,
+};
+const $ = id => document.getElementById(id);
+
+/* ============================== klaxon ============================= */
+let audioCtx = null;
+// browsers refuse audio before a user gesture: unlock on first click/tap
+// (runbook: click the page once during setup)
+window.addEventListener("pointerdown", ()=>{
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    audioCtx.resume();
+  }catch(e){}
+}, {once:true});
+function klaxon(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state !== "running") audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    for(let i=0;i<4;i++){
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "square";
+      o.frequency.setValueAtTime(i%2? 620: 880, t0 + i*0.28);
+      g.gain.setValueAtTime(0.0001, t0 + i*0.28);
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + i*0.28 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i*0.28 + 0.26);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0 + i*0.28); o.stop(t0 + i*0.28 + 0.27);
+    }
+  }catch(e){}
+}
+
+/* ============================ strip charts ========================= */
+function makeStrip(id, opts){
+  const cv = $(id), ctx = cv.getContext("2d");
+  function draw(data){
+    const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio||1;
+    if(cv.width !== w*dpr){ cv.width = w*dpr; cv.height = h*dpr; }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    if(data.length < 2) return;
+    let lo = opts.min !== undefined ? opts.min : Math.min(...data);
+    let hi = opts.max !== undefined ? opts.max : Math.max(...data);
+    if(hi-lo < (opts.span||0.1)){ const m=(hi+lo)/2, s=(opts.span||0.1)/2; lo=m-s; hi=m+s; }
+    ctx.strokeStyle = "rgba(95,118,136,.30)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+    ctx.strokeStyle = opts.color; ctx.lineWidth = 1.5; ctx.beginPath();
+    const n = data.length;
+    for(let i=0;i<n;i++){
+      const x = i/(n-1)*w, y = h - 3 - (data[i]-lo)/(hi-lo)*(h-6);
+      i? ctx.lineTo(x,y): ctx.moveTo(x,y);
+    }
+    ctx.stroke();
+    // endpoint dot
+    const y = h - 3 - (data[n-1]-lo)/(hi-lo)*(h-6);
+    ctx.fillStyle = opts.color; ctx.beginPath(); ctx.arc(w-2,y,2.5,0,7); ctx.fill();
+  }
+  return {draw};
+}
+const strips = {
+  accel: makeStrip("c-accel", {color:"#E63B23", min:0, max:3, span:.5}),
+  tilt:  makeStrip("c-tilt",  {color:"#1F6E93", min:0, max:120}),
+  vbatt: makeStrip("c-vbatt", {color:"#0E8F63", span:.6}),
+  temp:  makeStrip("c-temp",  {color:"#B26A05", span:4}),
+};
+function redrawStrips(){
+  const win = S.hb.slice(-120);
+  strips.vbatt.draw(win.map(h=>h.vbatt));
+  strips.temp.draw(win.map(h=>h.temp));
+  const last = win[win.length-1];
+  if(last){
+    $("v-vbatt").textContent = last.vbatt.toFixed(1)+" V";
+    $("v-temp").textContent = last.temp+" °C";
+    $("hb-bytes").textContent = last.bytes+" B each";
+  }
+}
+
+// live-stream charts: time-based, so a blackout leaves a VISIBLE hole that
+// the backfill then closes in front of the audience
+function makeTeleChart(id, pick, opts){
+  const cv = $(id), ctx = cv.getContext("2d");
+  return function draw(){
+    const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio||1;
+    if(cv.width !== w*dpr){ cv.width = w*dpr; cv.height = h*dpr; }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    const now = (S.tele.length? S.tele[S.tele.length-1].t : 0);
+    const span = 75, t0 = now - span;
+    const data = S.tele.filter(p=>p.t >= t0);
+    ctx.strokeStyle = "rgba(95,118,136,.30)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+    if(data.length < 2) return;
+    const lo = opts.min, hi = opts.max;
+    ctx.strokeStyle = opts.color; ctx.lineWidth = 1.4; ctx.beginPath();
+    let pen = false;
+    for(const p of data){
+      const x = (p.t-t0)/span*w;
+      const y = h - 3 - Math.max(0, Math.min(1, (pick(p)-lo)/(hi-lo)))*(h-6);
+      if(!pen){ ctx.moveTo(x,y); pen = true; }
+      else ctx.lineTo(x,y);
+      if(p._gapAfter) pen = false;      // hole in the record
+    }
+    ctx.stroke();
+    const last = data[data.length-1];
+    const y = h - 3 - Math.max(0, Math.min(1, (pick(last)-lo)/(hi-lo)))*(h-6);
+    ctx.fillStyle = opts.color; ctx.beginPath(); ctx.arc(w-2,y,2.5,0,7); ctx.fill();
+  };
+}
+const teleAccel = makeTeleChart("c-accel", p=>p.a,    {color:"#E63B23", min:0, max:3});
+const teleTilt  = makeTeleChart("c-tilt",  p=>p.tilt, {color:"#1F6E93", min:0, max:120});
+function markGaps(){
+  for(let i=0;i<S.tele.length-1;i++)
+    S.tele[i]._gapAfter = (S.tele[i+1].t - S.tele[i].t) > 1.2;
+  if(S.tele.length) S.tele[S.tele.length-1]._gapAfter = false;
+}
+function drawTele(){
+  markGaps();
+  teleAccel(); teleTilt();
+  const last = S.tele[S.tele.length-1];
+  if(last){
+    $("v-accel").textContent = last.a.toFixed(2)+" g";
+    $("v-tilt").textContent = Math.round(last.tilt)+"°";
+  }
+}
+
+/* ============================ packet wall ========================== */
+function ensureBlocks(tier, total){
+  const holder = $("blocks-t"+tier);
+  if(holder.childElementCount === total) return;
+  holder.innerHTML = "";
+  for(let i=0;i<total;i++){
+    const d = document.createElement("i");
+    d.className = "blk t"+tier; d.style.display="block";
+    holder.appendChild(d);
+  }
+}
+function onPacket(ev){
+  if(ev.tier > 2) return;               // gap backfill has its own UI
+  if(S.activeBurst !== null && ev.report !== S.activeBurst) return;  // stale burst
+  if(typeof ev.total !== "number"){            // corrupt frame: mark only
+    const b = $("blocks-t"+ev.tier) && $("blocks-t"+ev.tier).children[ev.seq];
+    if(b) b.classList.add("bad");
+    return;
+  }
+  ensureBlocks(ev.tier, ev.total);
+  const holder = $("blocks-t"+ev.tier);
+  const blk = holder.children[ev.seq];
+  if(blk) blk.classList.add(ev.type==="corrupt" ? "bad" : "on");
+  $("lab-t"+ev.tier).textContent = ev.got+" / "+ev.total+" pkts";
+}
+function resetWall(){
+  ["1","2"].forEach(t=>{ $("blocks-t"+t).innerHTML=""; $("lab-t"+t).textContent="—"; });
+}
+
+/* ============================ 3D replay ============================ */
+const view = $("view3d");
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(devicePixelRatio||1);
+view.appendChild(renderer.domElement);
+// whiteout glacier: pale fog swallows the horizon, dark robot on white ice
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xE4EDF3);
+scene.fog = new THREE.Fog(0xE4EDF3, 10, 34);
+const camera = new THREE.PerspectiveCamera(42, 1, .1, 200);
+camera.position.set(3.4, 2.1, 4.6);
+camera.lookAt(0, 0.7, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c9d6, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(4,6,3); scene.add(key);
+const rim = new THREE.DirectionalLight(0xcfe4f0, 0.35); rim.position.set(-5,3,-6); scene.add(rim);
+
+// distant massif: two rings of low-poly peaks fading into the fog
+(function(){
+  const far = new THREE.MeshStandardMaterial({color:0xC5D4DF, roughness:1, metalness:0, flatShading:true});
+  const near = new THREE.MeshStandardMaterial({color:0xD4E1EA, roughness:.9, metalness:0, flatShading:true});
+  let seed = 42; const rnd = ()=> (seed = (seed*9301+49297)%233280)/233280;
+  for(let i=0;i<16;i++){
+    const a = i/16*Math.PI*2 + rnd()*0.3;
+    const r = 26 + rnd()*8, h = 7+rnd()*9;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(4+rnd()*5, h, 5), far);
+    m.position.set(Math.cos(a)*r, h/2-0.4, Math.sin(a)*r);
+    m.rotation.y = rnd()*Math.PI; scene.add(m);
+  }
+  for(let i=0;i<10;i++){
+    const a = i/10*Math.PI*2 + 0.31 + rnd()*0.4;
+    const r = 16 + rnd()*5, h = 2.5+rnd()*3.5;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(1.6+rnd()*2.4, h, 5), near);
+    m.position.set(Math.cos(a)*r, h/2-0.3, Math.sin(a)*r);
+    m.rotation.y = rnd()*Math.PI; scene.add(m);
+  }
+})();
+
+// falling snow
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let snow = null;
+if(!reducedMotion){
+  const N = 700, pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){ pos[i*3]=(Math.random()-.5)*24; pos[i*3+1]=Math.random()*10; pos[i*3+2]=(Math.random()-.5)*24; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  snow = new THREE.Points(g, new THREE.PointsMaterial({color:0x9FB4C4, size:2.2, transparent:true, opacity:.55, sizeAttenuation:false}));
+  scene.add(snow);
+}
+
+// ice floor
+const grid = new THREE.GridHelper(40, 80, 0xA8C0CF, 0xC9D8E2);
+grid.material.transparent = true; grid.material.opacity = .55; scene.add(grid);
+const floorGeo = new THREE.PlaneGeometry(40,40);
+const floor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({color:0xE9F0F5, roughness:.55, metalness:.08}));
+floor.rotation.x = -Math.PI/2; floor.position.y = -0.005; scene.add(floor);
+
+// impact FX: light burst + expanding floor ring + camera shake + screen flash
+const impactLight = new THREE.PointLight(0xE63B23, 0, 8); impactLight.position.set(0,.6,0); scene.add(impactLight);
+const impactRing = new THREE.Mesh(new THREE.RingGeometry(.4,.5,48),
+  new THREE.MeshBasicMaterial({color:0xE63B23, transparent:true, opacity:0, side:THREE.DoubleSide}));
+impactRing.rotation.x = -Math.PI/2; impactRing.position.y = 0.01; scene.add(impactRing);
+let fx = 0;   // 1 -> 0 envelope
+function fireImpactFx(){
+  if(reducedMotion){ return; }
+  fx = 1;
+  $("impact-flash").style.opacity = "1";
+  setTimeout(()=> $("impact-flash").style.opacity = "0", 90);
+}
+
+// robot: outer maps z-up body frame into three.js y-up world
+const outer = new THREE.Group(); outer.rotation.x = -Math.PI/2; scene.add(outer);
+const body = new THREE.Group(); outer.add(body);
+const matBody = new THREE.MeshStandardMaterial({color:0x2B3947, roughness:.55, metalness:.3});
+const matAcc = new THREE.MeshStandardMaterial({color:0xE63B23, roughness:.45});
+const matDark = new THREE.MeshStandardMaterial({color:0x18232E, roughness:.6});
+let humanoid = null, armChain = null;
+
+function buildHumanoid(){
+  const g = new THREE.Group();
+  const box = (w,d,h,m)=> new THREE.Mesh(new THREE.BoxGeometry(w,d,h), m);
+  const torso = box(.34,.2,.5,matBody); torso.position.z = .95; g.add(torso);
+  const head = box(.16,.16,.16,matAcc); head.position.z = 1.32; g.add(head);
+  const visor = box(.12,.03,.05,matDark); visor.position.set(.06,-.09,1.33); g.add(visor);
+  [[-.24,1.05],[.24,1.05]].forEach(([x,z])=>{ const a=box(.09,.09,.42,matDark); a.position.set(x,0,z-.2); g.add(a); });
+  [[-.1,.35],[.1,.35]].forEach(([x,z])=>{ const l=box(.11,.11,.62,matBody); l.position.set(x,0,z); g.add(l); });
+  [[-.1,.03],[.1,.03]].forEach(([x,z])=>{ const f=box(.13,.22,.06,matAcc); f.position.set(x,-.04,z); g.add(f); });
+  return g;
+}
+function buildArm(nj){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.14,24), matDark);
+  base.rotation.x = Math.PI/2; base.position.z = .07; g.add(base);
+  const links = [];
+  let parent = g, zoff = .14;
+  for(let i=0;i<nj;i++){
+    const joint = new THREE.Group(); joint.position.z = zoff; parent.add(joint);
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.4), i%2? matBody: matAcc);
+    seg.position.z = .2; joint.add(seg);
+    links.push(joint); parent = joint; zoff = .4;
+  }
+  return {group:g, links};
+}
+function setModel(nj){
+  if(humanoid){ body.remove(humanoid); humanoid=null; }
+  if(armChain){ body.remove(armChain.group); armChain=null; }
+  if(nj > 0){ armChain = buildArm(nj); body.add(armChain.group); }
+  else { humanoid = buildHumanoid(); body.add(humanoid); }
+}
+setModel(0);
+
+/* -------- replay engine -------- */
+const R = { seg:null, frames:0, idx:0, playing:false, speed:0.5, loop:false,
+            loopStart:0, amag:[], height:[], peakIdx:0, lastTs:0 };
+function segQuat(seg,i){ return new THREE.Quaternion(seg.quat[1][i], seg.quat[2][i], seg.quat[3][i], seg.quat[0][i]); }
+function loadSegment(seg){
+  R.seg = seg; R.frames = seg.n; R.idx = Math.max(0, R.idx < seg.n? R.idx: 0);
+  R.amag = []; R.height = [];
+  for(let i=0;i<seg.n;i++){
+    const ax=seg.accel[0][i], ay=seg.accel[1][i], az=seg.accel[2][i];
+    R.amag.push(Math.sqrt(ax*ax+ay*ay+az*az));
+  }
+  R.peakIdx = R.amag.indexOf(Math.max(...R.amag));
+  if(R.loopStart >= seg.n-1) R.loopStart = 0;   // stale loop point from a longer segment
+  // free-fall height estimate: integrate 1/2 g t^2 during |a|<0.35 run pre-impact
+  let ffStart = R.peakIdx;
+  while(ffStart>0 && R.amag[ffStart-1] < 0.35) ffStart--;
+  const rate = seg.rate || 100;
+  for(let i=0;i<seg.n;i++){
+    if(i>=ffStart && i<R.peakIdx){
+      const t=(i-ffStart)/rate; R.height.push(Math.min(1.2, .5*9.81*t*t));
+    } else R.height.push(0);
+  }
+  setModel(seg.n_joints||0);
+  $("replay-empty").style.display = "none";
+  $("gforce-hud").style.display = "block";
+  drawSpark();
+  updateBadges();
+}
+function updateBadges(){
+  const holder = $("replay-badges"); holder.innerHTML = "";
+  const mk = (txt,cls)=>{ const d=document.createElement("div"); d.className="badge "+cls; d.textContent=txt; holder.appendChild(d); };
+  if(S.view === "live"){
+    mk("◉ LIVE TWIN","q1");
+    mk("STREAMED OVER THE 2 KBPS LINK","");
+    if(S.backfilled) mk("BACKFILLED "+S.backfilled+" · LOST 0","q2");
+    return;
+  }
+  const rep = S.reports[S.currentReport];
+  if(!rep) return;
+  mk("REPORT #"+String(S.currentReport).padStart(3,"0"),"");
+  if(R.seg) mk(R.seg.tier===2? "FULL RATE · "+Math.round(R.seg.rate)+" HZ" : "PREVIEW · "+Math.round(R.seg.rate)+" HZ", R.seg.tier===2?"q2":"q1");
+  mk("RECONSTRUCTED FROM "+(R.seg? (R.seg.tier===2? "TIER-2":"TIER-1"):"—")+" BURST","");
+}
+function setView(v){
+  S.view = v;
+  $("btn-live").classList.toggle("toggled", v==="live");
+  if(v==="live"){ R.playing = false; $("btn-play").textContent = "▶ REPLAY"; }
+  else $("btn-play").textContent = R.playing? "❚❚ PAUSE" : "▶ PLAY";
+  updateBadges();
+}
+function applyFrame(i){
+  if(!R.seg) return;
+  const prevF = Math.round(R.idx);
+  R.idx = Math.max(0, Math.min(R.frames-1, i));   // keep fractional position
+  const f = Math.round(R.idx);                     // integer frame for lookup
+  if(R.playing && prevF < R.peakIdx && f >= R.peakIdx) fireImpactFx();
+  if(armChain){
+    for(let j=0;j<armChain.links.length;j++){
+      const q = R.seg.joints[j][f];
+      if(j%2===0) armChain.links[j].rotation.z = q; else armChain.links[j].rotation.y = q;
+    }
+  } else {
+    body.quaternion.copy(segQuat(R.seg,f));
+  }
+  outer.position.y = R.seg.n_joints? 0 : 0.02 + (R.height[R.peakIdx-1]||0) - (R.height[f]||0);
+  const g = R.amag[f]||1;
+  $("hud-g").textContent = g.toFixed(1);
+  $("hud-g").className = "g" + (g>3? " hot":"");
+  const rate = R.seg.rate||100;
+  $("tlabel").textContent = "t = "+(R.idx/rate).toFixed(2)+" s / "+((R.frames-1)/rate).toFixed(1)+" s";
+  $("scrub").value = Math.round(R.idx/(R.frames-1)*1000);
+  drawSparkCursor();
+}
+function tick(ts){
+  requestAnimationFrame(tick);
+  const dt = Math.min(.1, (ts - R.lastTs)/1000); R.lastTs = ts;
+  // gentle camera orbit (+ impact shake)
+  const t = ts/1000;
+  camera.position.x = Math.cos(t*.08)*4.4; camera.position.z = Math.sin(t*.08)*4.4;
+  camera.position.y = 2.0;
+  if(fx > 0.01){
+    camera.position.x += (Math.random()-.5)*fx*.16;
+    camera.position.y += (Math.random()-.5)*fx*.16;
+    impactLight.intensity = fx*7;
+    const s = 1 + (1-fx)*7;
+    impactRing.scale.set(s,s,1);
+    impactRing.material.opacity = fx*.8;
+    fx *= Math.exp(-dt*4.5);
+  } else if(impactLight.intensity > 0){
+    impactLight.intensity = 0; impactRing.material.opacity = 0;
+  }
+  camera.lookAt(0,.6,0);
+  // live twin: latest streamed pose drives the robot directly
+  if(S.view === "live" && S.pose){
+    const nj = S.pose.joints.length;
+    if(nj && !armChain) setModel(nj);
+    if(!nj && !humanoid) setModel(0);
+    if(armChain){
+      for(let j=0;j<armChain.links.length && j<nj;j++){
+        if(j%2===0) armChain.links[j].rotation.z = S.pose.joints[j];
+        else armChain.links[j].rotation.y = S.pose.joints[j];
+      }
+    } else {
+      const q = S.pose.quat;
+      body.quaternion.set(q[1], q[2], q[3], q[0]);
+    }
+    outer.position.y = 0.02;
+  }
+  if(snow){
+    const p = snow.geometry.attributes.position;
+    for(let i=0;i<p.count;i++){
+      let y = p.getY(i) - dt*(.5 + (i%5)*.11);
+      if(y < 0) y = 10;
+      p.setY(i, y);
+      p.setX(i, p.getX(i) + Math.sin(t*.7 + i)*dt*.12);
+    }
+    p.needsUpdate = true;
+  }
+  if(R.seg && R.playing && S.view === "replay"){
+    const rate = R.seg.rate||100;
+    let next = R.idx + dt*rate*R.speed;
+    if(next >= R.frames-1){
+      if(R.loop) next = R.loopStart; else { next = R.frames-1; R.playing = false; $("btn-play").textContent="▶ PLAY"; }
+    }
+    applyFrame(next);
+  }
+  const w = view.clientWidth, h = view.clientHeight;
+  if(w && h && (renderer.domElement.width !== Math.round(w*(devicePixelRatio||1)) ||
+                renderer.domElement.height !== Math.round(h*(devicePixelRatio||1)))){
+    renderer.setSize(w,h,false);
+    renderer.domElement.style.width = "100%"; renderer.domElement.style.height = "100%";
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(ts=>{ R.lastTs=ts; tick(ts); });
+
+/* -------- spark (g-force) -------- */
+const spark = $("spark"), sctx = spark.getContext("2d");
+function drawSpark(){
+  const w = spark.clientWidth, h = spark.clientHeight, dpr = devicePixelRatio||1;
+  spark.width = w*dpr; spark.height = h*dpr; sctx.setTransform(dpr,0,0,dpr,0,0);
+  sctx.clearRect(0,0,w,h);
+  if(!R.seg) return;
+  const n = R.amag.length, max = Math.max(3, ...R.amag);
+  sctx.fillStyle = "rgba(31,110,147,.10)";
+  sctx.strokeStyle = "#1F6E93"; sctx.lineWidth = 1.2; sctx.beginPath();
+  for(let i=0;i<n;i++){
+    const x=i/(n-1)*w, y=h-2-(R.amag[i]/max)*(h-6);
+    i? sctx.lineTo(x,y): sctx.moveTo(x,y);
+  }
+  sctx.stroke();
+  // peak marker
+  const px = R.peakIdx/(n-1)*w, py = h-2-(R.amag[R.peakIdx]/max)*(h-6);
+  sctx.fillStyle = "#D42B1E"; sctx.beginPath(); sctx.arc(px,py,3,0,7); sctx.fill();
+  sctx.fillStyle = "#E63B23"; sctx.font = "10px 'IBM Plex Mono'";
+  sctx.fillText(R.amag[R.peakIdx].toFixed(1)+" g", Math.min(w-46,px+6), Math.max(10,py-4));
+}
+function drawSparkCursor(){
+  drawSpark();
+  if(!R.seg) return;
+  const w = spark.clientWidth, h = spark.clientHeight;
+  const x = R.idx/(R.frames-1)*w;
+  sctx.strokeStyle = "#E63B23"; sctx.lineWidth = 1;
+  sctx.beginPath(); sctx.moveTo(x,0); sctx.lineTo(x,h); sctx.stroke();
+}
+spark.addEventListener("click", e=>{
+  if(!R.seg) return;
+  const r = spark.getBoundingClientRect();
+  applyFrame((e.clientX-r.left)/r.width*(R.frames-1));
+});
+
+/* -------- transport controls -------- */
+$("btn-live").onclick = ()=> setView("live");
+$("btn-play").onclick = ()=>{
+  if(!R.seg) return;
+  if(S.view === "live") setView("replay");
+  R.playing = !R.playing; if(R.playing && R.idx>=R.frames-2) R.idx=0;
+  $("btn-play").textContent = R.playing? "❚❚ PAUSE":"▶ PLAY";
+};
+$("btn-loop").onclick = e=>{ R.loop=!R.loop; e.target.classList.toggle("toggled",R.loop); };
+document.querySelectorAll(".spd").forEach(b=> b.onclick = ()=>{
+  R.speed = parseFloat(b.dataset.speed);
+  document.querySelectorAll(".spd").forEach(x=>x.classList.toggle("toggled",x===b));
+});
+$("scrub").oninput = e=>{ if(R.seg){ if(S.view==="live") setView("replay"); R.playing=false; $("btn-play").textContent="▶ PLAY"; applyFrame(e.target.value/1000*(R.frames-1)); } };
+
+/* ---------- auto-play choreography: the wow beat ---------- */
+function autoPlay(rep){
+  const seg = rep.segments[2] || rep.segments[1];
+  if(!seg) return;
+  setView("replay");
+  S.currentReport = rep.id;
+  loadSegment(seg);
+  const rate = seg.rate||100;
+  const start = Math.max(0, (R.peakIdx/rate - 3.0))*rate;
+  R.loopStart = start;
+  applyFrame(start);
+  R.speed = 0.5; R.playing = true; R.loop = true;
+  $("btn-loop").classList.add("toggled");
+  $("btn-play").textContent = "❚❚ PAUSE";
+  document.querySelectorAll(".spd").forEach(x=>x.classList.toggle("toggled",x.dataset.speed==="0.5"));
+  renderLog();
+}
+
+/* ============================ analysis ============================= */
+function renderAnalysis(a){
+  $("analysis-sum").textContent = a.summary;
+  const m = $("analysis-metrics"); m.innerHTML = "";
+  const mk=(k,v,hot)=>{ const d=document.createElement("span"); d.className="chip"+(hot?" hot":""); d.innerHTML=k+" <b>"+v+"</b>"; m.appendChild(d); };
+  mk("PEAK", a.peak_g+" g", a.kind!=="arm");
+  if(a.kind==="arm"){ mk("EVENT", "external force", true); }
+  else {
+    mk("WARNING", a.warning_s+" s");
+    if(a.freefall_s>0.05){ mk("FREE-FALL", a.freefall_s+" s"); mk("DROP EST", a.drop_m+" m"); }
+    mk("AXIS", a.direction+" "+a.axis);
+    mk("REST", a.final_attitude);
+  }
+}
+function renderLog(){
+  const holder = $("incident-log"); holder.innerHTML = "";
+  const ids = Object.keys(S.reports).sort((a,b)=>b-a);
+  if(!ids.length){ holder.innerHTML = '<div class="empty">— none —</div>'; return; }
+  ids.forEach(id=>{
+    const rep = S.reports[id];
+    const d = document.createElement("div");
+    d.className = "item"+(String(S.currentReport)===String(id)?" sel":"");
+    d.innerHTML = '<span class="id">#'+String(id).padStart(3,"0")+'</span><span class="c">'+
+      (rep.analysis? rep.analysis.summary.slice(0,60)+"…" : rep.cause || "receiving…")+'</span>';
+    d.onclick = ()=>{ S.currentReport = parseInt(id);
+      const seg = rep.segments[2]||rep.segments[1];
+      if(seg){ setView("replay"); R.loopStart = 0; loadSegment(seg); applyFrame(0); }
+      if(rep.analysis) renderAnalysis(rep.analysis);
+      renderLog(); };
+    holder.appendChild(d);
+  });
+}
+
+/* ============================ incident fx ========================== */
+let lastBanner = 0;
+function incidentFx(cause){
+  if(Date.now()-lastBanner < 5000) return;
+  lastBanner = Date.now();
+  $("incident-cause").textContent = cause || "onboard trigger fired — burst inbound";
+  const ov = $("incident-overlay");
+  ov.classList.remove("on"); void ov.offsetWidth; ov.classList.add("on");
+  klaxon();
+  setTimeout(()=> ov.classList.remove("on"), 4500);
+}
+
+/* ============================ websocket ============================ */
+function getReport(id){
+  return S.reports[id] = S.reports[id] || {id, segments:{}, packets:{}, analysis:null, cause:null};
+}
+function handle(ev, replayed){
+  if(!replayed) S.events.push(ev);
+  switch(ev.type){
+    case "hello": S.sourceName = ev.source; $("src-badge").textContent = "SOURCE: "+ev.source.toUpperCase(); break;
+    case "state": {
+      S.liveCount++;
+      S.pose = {quat: ev.quat, joints: ev.joints||[]};
+      S.lastStateRx = Date.now();
+      S.tele.push({t: ev.t, a: ev.accel_g, tilt: ev.tilt});
+      if(S.tele.length > 1600) S.tele.splice(0, 400);
+      if(S.view === "live"){
+        $("replay-empty").style.display = "none";
+        $("gforce-hud").style.display = "block";
+        $("hud-g").textContent = ev.accel_g.toFixed(1);
+        $("hud-g").className = "g" + (ev.accel_g > 3? " hot":"");
+      }
+      break;
+    }
+    case "gap": {
+      const rate = ev.rate || 12;
+      const add = [];
+      for(let i=0;i<ev.n;i++){
+        const ax=ev.accel[0][i], ay=ev.accel[1][i], az=ev.accel[2][i];
+        const q1=ev.quat[1][i], q2=ev.quat[2][i];
+        const cz = Math.max(-1, Math.min(1, 1 - 2*(q1*q1 + q2*q2)));
+        add.push({t: ev.t0 + i/rate,
+                  a: Math.sqrt(ax*ax+ay*ay+az*az),
+                  tilt: Math.acos(cz)*180/Math.PI});
+      }
+      S.tele = S.tele.concat(add).sort((x,y)=>x.t-y.t);
+      S.backfilled += ev.n;
+      drawTele();
+      const el = $("recovered");
+      $("recovered-text").textContent = "▲ BACKFILLED "+ev.n+" SAMPLES · GAP CLOSED · 0 LOST";
+      el.style.display = "block";
+      clearTimeout(el._t); el._t = setTimeout(()=> el.style.display="none", 6000);
+      break;
+    }
+    case "hb": {
+      S.hb.push(ev); if(S.hb.length>600) S.hb.splice(0,200);
+      S.lastHb = Date.now();
+      const name = ["NOMINAL","INCIDENT","TRANSMITTING","DELIVERED"][ev.state]||"NOMINAL";
+      // the banner fires ONLY from the state bit that crossed the link
+      // (lastHbState===null guards a dashboard opened mid-incident)
+      if((name==="INCIDENT"||name==="TRANSMITTING") && S.lastHbState==="NOMINAL" && !replayed)
+        incidentFx(S.pendingCause||null);
+      S.lastHbState = name;
+      setState(name);
+      redrawStrips(); break;
+    }
+    case "status": {
+      $("kbps").textContent = ev.kbps.toFixed(2)+" / "+(ev.bps_cap/1000).toFixed(1)+" kbps";
+      $("linkbar").firstElementChild.style.transform = "scaleX("+Math.min(1,ev.kbps/(ev.bps_cap/1000))+")";
+      $("linkbar").firstElementChild.style.background = ev.up? "var(--ice)":"var(--bad)";
+      $("queue").textContent = ev.queued;
+      $("buffered").textContent = ev.buffered_s+" s";
+      $("rate").textContent = ev.rate_hz+" Hz";
+      if(S.linkUp !== ev.up){
+        S.linkUp = ev.up;
+        updateLinkBtn();
+        if(!ev.up){ S.blackoutStart = Date.now(); $("blackout").style.display = "flex"; }
+        else { $("blackout").style.display = "none"; }
+      }
+      // NOTE: state pill is deliberately NOT set here — the status channel
+      // is a local debug feed; the pill tracks the heartbeat that crossed
+      // the 2 kbps link (see case "hb"), keeping the README claim true
+      break;
+    }
+    case "incident": { const rep = getReport(ev.report); rep.cause = ev.cause;
+      // no banner here: this is the in-process debug channel. It only
+      // pre-stages the cause string for the link-driven banner.
+      if(!replayed) S.pendingCause = ev.cause;
+      renderLog(); break; }
+    case "burst_start": { resetWall(); S.activeBurst = ev.report;
+      const rep=getReport(ev.report); rep.sizes=ev.sizes; break; }
+    case "packet": onPacket(ev); break;
+    case "corrupt": onPacket(ev); break;
+    case "segment": {
+      const rep = getReport(ev.report);
+      rep.segments[ev.tier] = ev;
+      if(!replayed && (ev.tier===1 && !rep.segments[2])) autoPlay(rep);
+      else if(ev.tier===2 && String(S.currentReport)===String(ev.report)){
+        const prevRate = rep.segments[1]? rep.segments[1].rate : ev.rate;
+        const scale = ev.rate/prevRate;
+        const keep = R.idx*scale;
+        R.loopStart = R.loopStart*scale;
+        loadSegment(ev); applyFrame(Math.min(keep, ev.n-1));
+      }
+      else if(replayed && !R.seg){
+        S.currentReport = ev.report; loadSegment(ev); applyFrame(0);
+      }
+      renderLog(); break;
+    }
+    case "analysis": {
+      const rep = getReport(ev.report); rep.analysis = ev;
+      if(String(S.currentReport)===String(ev.report) || !S.currentReport) renderAnalysis(ev);
+      renderLog(); break;
+    }
+  }
+}
+function setState(name){
+  if(name===S.state) return;
+  S.state = name;
+  const pill = $("state-pill"); pill.className = "pill "+name; pill.textContent = name;
+}
+let ws;
+function connect(){
+  ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onmessage = e => { const ev = JSON.parse(e.data); handle(ev, !!ev.replayed); };
+  ws.onclose = ()=> setTimeout(connect, 1000);
+}
+connect();
+setInterval(()=>{
+  $("hb-age").textContent = S.lastHb? ((Date.now()-S.lastHb)/1000).toFixed(1)+" s ago" : "—";
+  $("hb-age").style.color = (Date.now()-S.lastHb>3500)? "var(--bad)":"var(--ink)";
+}, 300);
+
+/* ============================ op strip ============================= */
+// commands go over stateless HTTP POST — never blocked by websocket state
+const send = o => { fetch("/op", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(o)}).catch(()=>{}); };
+$("btn-fall").onclick = ()=> send({cmd:"fall"});
+$("btn-reset").onclick = ()=> send({cmd:"reset"});
+$("btn-armed").onclick = e=>{ const on=!e.target.classList.contains("toggled"); e.target.classList.toggle("toggled",on); e.target.textContent = on?"TRIGGER ARMED":"TRIGGER DISARMED"; send({cmd:"arm",on}); };
+function updateLinkBtn(){
+  const b = $("btn-linkup");
+  if(S.linkUp){ b.textContent = "✂ CUT THE LINK"; b.className = "primary"; }
+  else { b.textContent = "▲ RESTORE LINK"; b.className = "toggled"; }
+}
+$("btn-linkup").onclick = ()=> send({cmd:"link", up: !S.linkUp});
+// blackout counter + rolling chart/badge refresh
+setInterval(()=>{
+  if(!S.linkUp && S.blackoutStart){
+    const held = Math.round((Date.now()-S.blackoutStart)/1000 * 8);
+    $("bo-count").textContent = held;
+  }
+  if(S.tele.length) drawTele();
+  if(S.view === "live") updateBadges();
+}, 400);
+$("sl-bps").oninput = e=>{ $("o-bps").textContent=e.target.value+" bps"; send({cmd:"link",bps:+e.target.value}); };
+$("sl-loss").oninput = e=>{ $("o-loss").textContent=e.target.value+"% loss"; send({cmd:"link",loss:e.target.value/100}); };
+
+/* backup export / import */
+$("btn-export").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(S.events)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "icebox_backup_"+Date.now()+".json"; a.click();
+};
+$("btn-import").onclick = ()=> $("file-import").click();
+$("file-import").onchange = async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const evs = JSON.parse(await file.text());
+  // replay as `replayed` (no re-append to S.events, no premature fx);
+  // skip live-channel chatter, keep the incident story, then play it
+  for(const ev of evs){
+    if(ev.type==="hello"||ev.type==="hb"||ev.type==="status") continue;
+    handle(ev, true);
+    if(ev.type==="segment") await new Promise(r=>setTimeout(r,300));
+    if(ev.type==="packet") await new Promise(r=>setTimeout(r,10));
+  }
+  const ids = Object.keys(S.reports).map(Number).sort((a,b)=>a-b);
+  if(ids.length){
+    const rep = S.reports[ids[ids.length-1]];
+    incidentFx(rep.cause || "replayed incident (backup recording)");
+    autoPlay(rep);
+    if(rep.analysis) renderAnalysis(rep.analysis);
+  }
+};
+</script>
+</body>
+</html>
