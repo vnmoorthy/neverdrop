@@ -16,6 +16,13 @@ all through a 2,000 bit/s satellite link. No cloud, anywhere.**
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](requirements.txt)
 [![license](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
+### **[▶ &nbsp;WATCH THE LIVE DEMO](https://vnmoorthy.github.io/neverdrop/)**
+*a real captured session — genuine 2 kbps events replayed through the actual mission-control UI*
+
+[demo runbook](DEMO_RUNBOOK.md) · [submission](SUBMISSION.md) · [honesty ledger](#honesty-ledger-judges-will-ask)
+
+![The demo in 12 seconds](assets/demo.svg)
+
 *Built in one day at the Himalaya Robotics Hack 2026 · San Francisco —
 for the [Robot Everest](https://www.roboteverest.com/) expedition, which departs September 5.*
 
@@ -43,6 +50,14 @@ fits through that soda straw:
 > cloud can't follow — mines, oceans, mountains, orbit. Video doesn't
 > scale; state-streaming does. NeverDrop is the observability layer of the
 > physical world, priced per robot per month.
+
+## What's inside
+
+|  |  |  |
+|---|---|---|
+| 🤖 **Live digital twin** — 26-byte pose frames, 8 Hz, ~1.7 kbps | 📦 **Store & forward** — blackouts buffer onboard, backfill on restore | 🧊 **Black-box crash recorder** — 10 s burst, 3D replay in ~7 s |
+| 📡 **Real link discipline** — token-bucket 2 kbps UDP, 340 B SBD frames, CRC-16 | 🧠 **Root cause, computed** — impact g, free-fall, axis, rest attitude from transmitted bytes | 🦾 **Real hardware ready** — phone IMU today, Feetech serial arms via one adapter |
+| 🎛️ **Priority scheduling** — heartbeats > live frames > bursts, self-throttling | 🔁 **Supersede semantics** — a new crash preempts a draining burst, backfill survives | ✅ **CI-proven** — unit suite + full phone E2E pass on every push, from a fresh clone |
 
 ## Quick start (one command)
 
