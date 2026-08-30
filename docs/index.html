@@ -5,22 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NeverDrop · Mission Control</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   /* glacier-light: ice-white instrument, one signal color (black-box orange-red),
      steel blue for data, deep slate ink */
-  --ground:#EDF2F6; --surface:#FBFDFE; --surface2:#F2F6F9; --line:#D3DEE7;
-  --ink:#15222D; --muted:#5F7688; --accent:#E63B23; --ice:#1F6E93;
+  --ground:#F4F6F8; --surface:#FDFDFE; --surface2:#F0F3F6; --line:#E1E7EC;
+  --ink:#171A20; --muted:#5C6670; --accent:#E82127; --ice:#3E6F8E;
   --good:#0E8F63; --warn:#B26A05; --bad:#D42B1E;
   --disp:'Big Shoulders Display','Arial Narrow',system-ui,sans-serif;
+  --ui:'Montserrat','Helvetica Neue',Arial,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;color:var(--ink);font-family:var(--mono);font-size:13px;overflow:hidden;
-  background:linear-gradient(180deg, #F6F9FB 0%, var(--ground) 60%, #E2EAF0 100%)}
-button{font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:6px 12px;cursor:pointer;letter-spacing:.06em;box-shadow:0 1px 2px rgba(21,34,45,.06)}
+body{margin:0;color:var(--ink);font-family:var(--ui);font-size:13px;overflow:hidden;
+  font-variant-numeric:tabular-nums;
+  background:linear-gradient(180deg, #F8FAFB 0%, var(--ground) 60%, #E7EDF2 100%)}
+button{font-family:var(--ui);font-weight:600;font-size:11px;text-transform:uppercase;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:7px 14px;cursor:pointer;letter-spacing:.14em;box-shadow:0 1px 2px rgba(23,26,32,.06)}
 button:hover{border-color:var(--ice);color:var(--ice)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;box-shadow:0 2px 10px rgba(230,59,35,.35)}
@@ -33,10 +35,10 @@ input[type=range]{accent-color:var(--accent)}
 
 /* ---------- top bar ---------- */
 #topbar{display:flex;align-items:center;gap:18px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--surface2);flex:none}
-.wordmark{font-family:var(--disp);font-weight:800;font-size:26px;letter-spacing:.04em;color:var(--ink)}
-.wordmark b{color:var(--accent)}
-.wordsub{font-size:10px;letter-spacing:.28em;color:var(--muted);margin-top:-3px}
-.pill{font-weight:600;letter-spacing:.12em;padding:6px 14px;border:1.5px solid var(--line);font-size:13px;background:var(--surface);transition:box-shadow .3s}
+.wordmark{font-family:var(--ui);font-weight:800;font-size:19px;letter-spacing:.32em;color:var(--ink)}
+.wordmark b{color:var(--accent);font-weight:800}
+.wordsub{font-family:var(--ui);font-weight:500;font-size:8.5px;letter-spacing:.34em;color:var(--muted);margin-top:1px;text-transform:uppercase}
+.pill{font-family:var(--ui);font-weight:700;letter-spacing:.18em;padding:6px 16px;border:1.5px solid var(--line);border-radius:4px;font-size:11.5px;text-transform:uppercase;background:var(--surface);transition:box-shadow .3s}
 .pill.NOMINAL{color:var(--good);border-color:var(--good)}
 .pill.INCIDENT{color:#fff;background:var(--bad);border-color:var(--bad);animation:blink .5s steps(2) infinite;box-shadow:0 2px 18px rgba(212,43,30,.45)}
 .pill.TRANSMITTING{color:var(--warn);border-color:var(--warn)}
@@ -56,7 +58,7 @@ input[type=range]{accent-color:var(--accent)}
 .col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 .col:last-child{border-right:none}
 .panel{padding:12px 14px;border-bottom:1px solid var(--line)}
-.panel h2{font-size:10px;letter-spacing:.22em;color:var(--ice);margin:0 0 10px;font-weight:600}
+.panel h2{font-family:var(--ui);font-size:9.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:700}
 .panel h2 .sub{color:var(--muted);letter-spacing:.06em;text-transform:none;float:right}
 
 /* heartbeat strips */
@@ -137,8 +139,8 @@ input[type=range]{accent-color:var(--accent)}
 #incident-cause{text-align:center;color:#fff;font-size:14px;letter-spacing:.12em;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.6)}
 @media (prefers-reduced-motion: reduce){.pill.INCIDENT,#incident-overlay.on,.blk.on,#replay-empty .big{animation:none}}
 #opstrip{display:none}
-#demo-banner{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface2);font-size:12.5px;letter-spacing:.06em}
-#demo-banner a{color:var(--accent);font-weight:600;text-decoration:none}
+#demo-banner{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface2);font-family:var(--ui);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+#demo-banner a{color:var(--accent);font-weight:700;text-decoration:none}
 </style>
 </head>
 <body>
@@ -248,7 +250,7 @@ input[type=range]{accent-color:var(--accent)}
   </div>
 </div>
 
-<div id="demo-banner"><span id="demo-msg">▶ RECORDED LIVE SESSION — captured from the real pipeline at 2 kbps: live twin → blackout → backfill (0 lost) → crash → root cause.</span>
+<div id="demo-banner"><span id="demo-msg">▶ Recorded live session — real pipeline at 2 kbps: live twin → blackout → backfill (0 lost) → crash → root cause.</span>
 <a href="https://github.com/vnmoorthy/neverdrop">git clone → run it live</a></div>
 <div id="incident-overlay"><div><div id="incident-banner">⚠ INCIDENT</div><div id="incident-cause"></div></div></div>
 
@@ -436,6 +438,11 @@ function resetWall(){
 const view = $("view3d");
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(devicePixelRatio||1);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputEncoding = THREE.sRGBEncoding;
 view.appendChild(renderer.domElement);
 // whiteout glacier: pale fog swallows the horizon, dark robot on white ice
 const scene = new THREE.Scene();
@@ -444,8 +451,14 @@ scene.fog = new THREE.Fog(0xE4EDF3, 10, 34);
 const camera = new THREE.PerspectiveCamera(42, 1, .1, 200);
 camera.position.set(3.4, 2.1, 4.6);
 camera.lookAt(0, 0.7, 0);
-scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c9d6, 1.0));
-const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(4,6,3); scene.add(key);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c9d6, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 0.85); key.position.set(4,7,3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = key.shadow.camera.bottom = -7;
+key.shadow.camera.right = key.shadow.camera.top = 7;
+key.shadow.bias = -0.0015;
+scene.add(key);
 const rim = new THREE.DirectionalLight(0xcfe4f0, 0.35); rim.position.set(-5,3,-6); scene.add(rim);
 
 // distant massif: two rings of low-poly peaks fading into the fog
@@ -486,7 +499,9 @@ const grid = new THREE.GridHelper(40, 80, 0xA8C0CF, 0xC9D8E2);
 grid.material.transparent = true; grid.material.opacity = .55; scene.add(grid);
 const floorGeo = new THREE.PlaneGeometry(40,40);
 const floor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({color:0xE9F0F5, roughness:.55, metalness:.08}));
-floor.rotation.x = -Math.PI/2; floor.position.y = -0.005; scene.add(floor);
+floor.rotation.x = -Math.PI/2; floor.position.y = -0.005;
+floor.receiveShadow = true;
+scene.add(floor);
 
 // impact FX: light burst + expanding floor ring + camera shake + screen flash
 const impactLight = new THREE.PointLight(0xE63B23, 0, 8); impactLight.position.set(0,.6,0); scene.add(impactLight);
@@ -504,21 +519,53 @@ function fireImpactFx(){
 // robot: outer maps z-up body frame into three.js y-up world
 const outer = new THREE.Group(); outer.rotation.x = -Math.PI/2; scene.add(outer);
 const body = new THREE.Group(); outer.add(body);
-const matBody = new THREE.MeshStandardMaterial({color:0x2B3947, roughness:.55, metalness:.3});
-const matAcc = new THREE.MeshStandardMaterial({color:0xE63B23, roughness:.45});
-const matDark = new THREE.MeshStandardMaterial({color:0x18232E, roughness:.6});
-let humanoid = null, armChain = null;
+// Optimus-style humanoid: white shell panels, dark joint gaps, capsule limbs
+const matShell = new THREE.MeshStandardMaterial({color:0xE9ECEF, roughness:.32, metalness:.15});
+const matJoint = new THREE.MeshStandardMaterial({color:0x1B1F24, roughness:.5, metalness:.35});
+const matVisor = new THREE.MeshStandardMaterial({color:0x0C0F13, roughness:.15, metalness:.65});
+const matGlow = new THREE.MeshStandardMaterial({color:0xE82127, emissive:0xE82127, emissiveIntensity:.9, roughness:.4});
+const matBody = matJoint, matAcc = new THREE.MeshStandardMaterial({color:0xE82127, roughness:.45});
+let humanoid = null, humanoidParts = null, armChain = null;
 
 function buildHumanoid(){
+  // z-up body frame (outer group maps it to world). x = forward.
   const g = new THREE.Group();
-  const box = (w,d,h,m)=> new THREE.Mesh(new THREE.BoxGeometry(w,d,h), m);
-  const torso = box(.34,.2,.5,matBody); torso.position.z = .95; g.add(torso);
-  const head = box(.16,.16,.16,matAcc); head.position.z = 1.32; g.add(head);
-  const visor = box(.12,.03,.05,matDark); visor.position.set(.06,-.09,1.33); g.add(visor);
-  [[-.24,1.05],[.24,1.05]].forEach(([x,z])=>{ const a=box(.09,.09,.42,matDark); a.position.set(x,0,z-.2); g.add(a); });
-  [[-.1,.35],[.1,.35]].forEach(([x,z])=>{ const l=box(.11,.11,.62,matBody); l.position.set(x,0,z); g.add(l); });
-  [[-.1,.03],[.1,.03]].forEach(([x,z])=>{ const f=box(.13,.22,.06,matAcc); f.position.set(x,-.04,z); g.add(f); });
-  return g;
+  const cap = (r,len,m)=>{ const mm=new THREE.Mesh(new THREE.CapsuleGeometry(r,len,6,14),m); mm.rotation.x=Math.PI/2; return mm; };
+  const box = (w,d,h,m)=> new THREE.Mesh(new THREE.BoxGeometry(d,w,h), m);
+  const sph = (r,m)=> new THREE.Mesh(new THREE.SphereGeometry(r,18,14), m);
+
+  const pelvis = box(.27,.18,.13,matShell); pelvis.position.z=.92; g.add(pelvis);
+  const abdomen = box(.21,.15,.08,matJoint); abdomen.position.z=1.01; g.add(abdomen);
+  const chest = box(.34,.22,.32,matShell); chest.position.z=1.22; g.add(chest);
+  const chestPlate = box(.20,.02,.16,matVisor); chestPlate.position.set(.115,0,1.24); g.add(chestPlate);
+  const beacon = sph(.022,matGlow); beacon.position.set(.12,0,1.31); g.add(beacon);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.045,.05,.06,12), matJoint);
+  neck.rotation.x=Math.PI/2; neck.position.z=1.415; g.add(neck);
+  const head = cap(.095,.06,matShell); head.position.z=1.51; g.add(head);
+  const visor = box(.11,.045,.075,matVisor); visor.position.set(.075,0,1.52); g.add(visor);
+
+  const parts = {group:g, legs:[], arms:[]};
+  [[-1,.105],[1,.105]].forEach(([side,y])=>{
+    const hip = new THREE.Group(); hip.position.set(0, side*y, .88); g.add(hip);
+    const hipBall = sph(.062,matJoint); hip.add(hipBall);
+    const thigh = cap(.055,.28,matShell); thigh.position.z=-.20; hip.add(thigh);
+    const knee = sph(.052,matJoint); knee.position.z=-.40; hip.add(knee);
+    const shin = cap(.045,.26,matShell); shin.position.z=-.60; hip.add(shin);
+    const ankle = sph(.04,matJoint); ankle.position.z=-.79; hip.add(ankle);
+    const foot = box(.085,.21,.05,matVisor); foot.position.set(.05, 0, -.855); hip.add(foot);
+    parts.legs.push(hip);
+  });
+  [[-1,.245],[1,.245]].forEach(([side,y])=>{
+    const sh = new THREE.Group(); sh.position.set(0, side*y, 1.33); g.add(sh);
+    const shoulder = sph(.065,matJoint); sh.add(shoulder);
+    const upper = cap(.045,.20,matShell); upper.position.z=-.15; sh.add(upper);
+    const elbow = sph(.045,matJoint); elbow.position.z=-.29; sh.add(elbow);
+    const fore = cap(.038,.18,matShell); fore.position.z=-.43; sh.add(fore);
+    const hand = box(.05,.07,.10,matJoint); hand.position.z=-.575; sh.add(hand);
+    parts.arms.push(sh);
+  });
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; } });
+  return parts;
 }
 function buildArm(nj){
   const g = new THREE.Group();
@@ -535,10 +582,10 @@ function buildArm(nj){
   return {group:g, links};
 }
 function setModel(nj){
-  if(humanoid){ body.remove(humanoid); humanoid=null; }
+  if(humanoid){ body.remove(humanoid); humanoid=null; humanoidParts=null; }
   if(armChain){ body.remove(armChain.group); armChain=null; }
-  if(nj > 0){ armChain = buildArm(nj); body.add(armChain.group); }
-  else { humanoid = buildHumanoid(); body.add(humanoid); }
+  if(nj > 0){ armChain = buildArm(nj); armChain.group.traverse(o=>{ if(o.isMesh) o.castShadow=true; }); body.add(armChain.group); }
+  else { humanoidParts = buildHumanoid(); humanoid = humanoidParts.group; body.add(humanoid); }
 }
 setModel(0);
 
@@ -587,6 +634,7 @@ function updateBadges(){
 }
 function setView(v){
   S.view = v;
+  if(v === "replay"){ outer.position.x = 0; outer.position.z = 0; }  // replay at origin
   $("btn-live").classList.toggle("toggled", v==="live");
   if(v==="live"){ R.playing = false; $("btn-play").textContent = "▶ REPLAY"; }
   else $("btn-play").textContent = R.playing? "❚❚ PAUSE" : "▶ PLAY";
@@ -618,9 +666,14 @@ function applyFrame(i){
 function tick(ts){
   requestAnimationFrame(tick);
   const dt = Math.min(.1, (ts - R.lastTs)/1000); R.lastTs = ts;
-  // gentle camera orbit (+ impact shake)
+  // gentle camera orbit (+ impact shake), centered on the robot's traverse
   const t = ts/1000;
-  camera.position.x = Math.cos(t*.08)*4.4; camera.position.z = Math.sin(t*.08)*4.4;
+  const cx = (S.view==="live" && S.pose && S.pose.pos)? S.pose.pos[0] : 0;
+  const cz = (S.view==="live" && S.pose && S.pose.pos)? -S.pose.pos[1] : 0;
+  S._camx = (S._camx===undefined)? cx : S._camx + (cx-S._camx)*.04;   // smooth follow
+  S._camz = (S._camz===undefined)? cz : S._camz + (cz-S._camz)*.04;
+  camera.position.x = S._camx + Math.cos(t*.08)*4.4;
+  camera.position.z = S._camz + Math.sin(t*.08)*4.4;
   camera.position.y = 2.0;
   if(fx > 0.01){
     camera.position.x += (Math.random()-.5)*fx*.16;
@@ -633,9 +686,28 @@ function tick(ts){
   } else if(impactLight.intensity > 0){
     impactLight.intensity = 0; impactRing.material.opacity = 0;
   }
-  camera.lookAt(0,.6,0);
+  camera.lookAt(S._camx||0,.6,S._camz||0);
   // live twin: latest streamed pose drives the robot directly
   if(S.view === "live" && S.pose){
+    if(S.pose.pos){
+      outer.position.x = S.pose.pos[0]; outer.position.z = -S.pose.pos[1];
+      // procedural gait: swing limbs by distance travelled (visual garnish;
+      // orientation and position are the transmitted truth)
+      if(humanoidParts){
+        const px = S.pose.pos[0], py = S.pose.pos[1];
+        if(S._gp === undefined){ S._gp = 0; S._gx = px; S._gy = py; }
+        const step = Math.hypot(px-S._gx, py-S._gy);
+        S._gx = px; S._gy = py;
+        S._gspeed = (S._gspeed||0)*0.9 + Math.min(step/Math.max(dt,.001),1.2)*0.1;
+        S._gp += step*7.5;
+        const k = Math.min(1, S._gspeed/0.5);
+        const sw = Math.sin(S._gp);
+        humanoidParts.legs[0].rotation.y = sw*.5*k;
+        humanoidParts.legs[1].rotation.y = -sw*.5*k;
+        humanoidParts.arms[0].rotation.y = -sw*.35*k;
+        humanoidParts.arms[1].rotation.y = sw*.35*k;
+      }
+    }
     const nj = S.pose.joints.length;
     if(nj && !armChain) setModel(nj);
     if(!nj && !humanoid) setModel(0);
@@ -804,7 +876,7 @@ function handle(ev, replayed){
       S.liveCount++;
       if(ev.t >= (S._lastPoseT||0)){       // stale frame after restore: skip pose
         S._lastPoseT = ev.t;
-        S.pose = {quat: ev.quat, joints: ev.joints||[]};
+        S.pose = {quat: ev.quat, joints: ev.joints||[], pos: ev.pos||[0,0]};
       }
       S.lastStateRx = Date.now();
       S.tele.push({t: ev.t, a: ev.accel_g, tilt: ev.tilt});
@@ -932,7 +1004,7 @@ async function playSession(){
     try{ handle(ev, false); }catch(e){ console.warn("demo event", e); }
     if(ev.type === "hello") demoBadge();
   }
-  $("demo-msg").textContent = "SESSION COMPLETE \u2014 the crash replay above is scrubbable and loops. Clone the repo to run it live.";
+  $("demo-msg").textContent = "Session complete \u2014 the crash replay above is scrubbable and loops. Clone the repo to run it live.";
 }
 playSession();
 setInterval(()=>{
