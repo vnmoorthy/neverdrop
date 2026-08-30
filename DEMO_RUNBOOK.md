@@ -1,87 +1,81 @@
-# NeverDrop — 2-minute pitch runbook
+# NeverDrop — 2-minute pitch runbook (hardened)
 
-**Setup (before judges arrive):**
+**Setup:** `--role all --source arm` (real arm) with `--source sim` in a
+second terminal as fallback; dashboard on the projector; click the page
+once to arm audio; run `caffeinate -dims`. If using the phone instead:
+laptop on the phone's hotspot, verify `http://<laptop-ip>:8000` loads on
+the phone first. After a RESET wait ~15 s before triggering (recorder
+refills by design).
 
-- Dashboard on the projector, `--source phone` running, phone strapped in a
-  boot on the table, `--source sim` in a second terminal ready as fallback.
-- **Network:** laptop joins the PHONE's Personal Hotspot (venue Wi-Fi
-  usually blocks phone→laptop). Verify: open `http://<laptop-ip>:8000` in
-  the phone's browser — if it loads, Sensor Logger's push will land.
-- Run `caffeinate -dims` in a spare terminal so the laptop never sleeps.
-- **Click the dashboard page once** after loading it — browsers block audio
-  until a user gesture; one click arms the klaxon.
-- Export a clean backup incident (EXPORT button), keep the JSON on the
-  desktop. Leave the loss slider at 0.
-- If a fall follows a RESET, wait ~15 s before triggering so the recorder
-  refills (RESET clears the ring buffer by design).
+## The story
 
-## The script
+**1 · Problem (0:00).**
+> "This robot's only connection is two kilobits per second — a thousandth
+> of one video stream. Everything you're about to see fits through that."
 
-**[0:00] Hook — pick up the boot and tilt it:**
-> "This robot is above 8,000 meters. The only thing connecting it to Earth
-> is 2 kilobits per second of satellite — video needs a thousand times
-> more. That 3D robot on the wall is a live digital twin of this boot,
-> streaming through that soda straw. Watch." *(tilt the boot; the twin
-> tilts.)*
+**2 · Truth labels (0:10).** Point at the truth strip:
+> "Full disclosure up front: source — a real robot arm, real measurements;
+> the link is a lab model of that satellite budget — no satellite hardware;
+> and everything on this screen marked 'link' arrived as decoded packets,
+> not through a back door. The test-harness controls are labeled below."
 
-**[0:25] The cut.** Hand a judge the mouse:
-> "Storms kill satellite links for minutes at a time. Cut it."
+**3 · Live state (0:25).** Move the arm by hand:
+> "31-byte state frames, seven per second. That's the whole supervision
+> feed — base state, not video."
 
-They press **✂ CUT THE LINK**. Twin freezes, LINK BLACKOUT pulses, the
-buffered-onboard counter climbs, the charts tear a hole.
+**4 · Blackout (0:40).** A judge presses ✂ CUT THE LINK:
+> "Status is latest-value — nothing stale queues. Durable data keeps
+> recording to disk onboard."
 
-> "Most telemetry systems are now losing data forever. NeverDrop's robot
-> is buffering onboard and waiting."
+**5 · Restore (0:55).** ▲ RESTORE:
+> "Live comes back instantly. And now the robot declares what you missed —
+> a manifest with a hash — and delivers it: RECEIVING… VERIFIED, HASH OK.
+> We never say 'zero lost' without that proof."
 
-**[0:45] The restore.** They press **▲ RESTORE LINK**:
-> "Live comes back instantly — and watch the hole." *(the backfill lands;
-> the chart gap closes; the green stamp appears.)* "Backfilled. Zero
-> samples lost. The robot compressed its own blackout and sent it home
-> behind the live stream."
+**6 · Incident (1:15).** Yank the arm hard:
+> "Onboard trigger. The report is persisted to a SQLite outbox *before*
+> transmission, then chunked with a manifest. Watch the wall: unique,
+> duplicate, corrupt counts — and selective retransmit on a 270-byte
+> reverse channel."
 
-**[1:10] The crash.** Shove the boot off the table. Klaxon, red INCIDENT:
-> "And when something actually goes wrong, the built-in black box decides
-> the last ten seconds mattered — bursts them home as real 340-byte
-> Iridium packets — and there's the crash, reconstructed in 3D, with the
-> root cause computed from the bytes that crossed the link. Not scripted."
+**7 · Progressive delivery (1:35).** Tier-1 lands:
+> "Preliminary reconstruction with a confidence score and its limitations
+> stated. Tier-2 refines it. If chunks go missing past the retry policy it
+> says PARTIAL — it never lies."
 
-**[1:40] The business:**
-> "Every robot beyond the cloud — mines, oceans, mountains, orbit — needs
-> exactly this lifeline, and video physically cannot provide it. This is
-> the observability layer of the physical world, per robot, per month."
+**8 · Proof (1:50).**
+> "Fourteen deterministic failure scenarios in CI — loss, reorder,
+> corruption, both-side restarts. Black-box files you can inspect offline.
+> Clone it; every number is derived from the structs."
 
-**[1:55] The close:**
-> "The expedition leaves in six days. This is a Python process and an IMU.
-> It goes up the mountain with them."
+**9 · Close (2:00).**
+> "The recorder, prioritization, compression and verified delivery all run
+> at the edge today. The satellite modem is the next explicit integration —
+> its message limits are already enforced in the SBD profile."
 
-## Fallback ladder (decide in 5 seconds, never apologize)
+## Fallback ladder
 
-1. **Phone won't stream** → second terminal: `--source sim`. The twin,
-   cut/restore, and crash all work identically; say "recorded test
-   article" and drive it with the buttons.
-2. **Server dies** → restart is one command; while it boots, LOAD the
-   backup JSON — the dashboard replays a real incident through the same
-   UI. Say what it is.
-3. **Projector trouble** → `test_blackbox.py` prints the whole pipeline
-   proof, and `test_phone_e2e.py` proves the live path. ALL PASS as a
-   finale is legitimate nerd-sniping.
+1. Arm misbehaves → second terminal `--source sim`, say "synthetic source"
+   (the truth strip will say it for you).
+2. Server dies → restart; the outbox resumes any in-flight report — that
+   IS a demo beat, not a failure.
+3. Total loss → recorded end-to-end session at
+   vnmoorthy.github.io/neverdrop (labeled as recorded) or
+   `test_reliability.py` live in a terminal.
 
-## Judge Q&A ammo
+## Judge Q&A
 
-- **"Is the link real?"** — ~100-line token bucket over UDP at 2,000 bps
-  (`linksim.py`). Slider goes to 300 bps live. LINK DOWN genuinely holds
-  packets onboard; nothing is faked on restore.
-- **"What's simulated?"** — In phone mode: only space (loopback instead of
-  a satellite). Motion, framing, rate limit, reassembly, twin, backfill,
-  analysis: all live. Sim mode simulates the robot too — we say so.
-- **"Bandwidth math?"** — Twin: 26 B × 8 Hz ≈ 1.7 kbps (0.08% of one
-  video stream). Blackout backfill: ~12 s of history in 3 packets.
-  Crash: preview in ~1.2 KB, full 200 Hz record in ~24 KB.
-- **"Why not ARQ/retransmit?"** — SBD has no cheap reverse channel; we
-  buffer-and-backfill on restore and add 2× redundancy under injected
-  loss. Tiered so the important bytes land first.
-- **"Jetson Thor?"** — Onboard half is aiohttp-only Python sharing nothing
-  with ground but UDP datagrams; moving it to the Thor is a loopback
-  address change. No cloud anywhere.
-- **"False triggers?"** — jerk z-score + 3 g floor + debounce + upright
-  re-arm: 0 false fires in 60 s of gait; shove fires in ~1.1 s.
+- **"Is the link real?"** No — and the screen says so. It's a deterministic
+  token-bucket model (read `linksim.py`), plus an SBD session model with
+  the real 340/270-byte limits. The modem is an explicit integration
+  boundary.
+- **"How do you know nothing was lost?"** We don't claim it without the
+  transmitted manifest and SHA-256 verification; the UI states coverage
+  x/y and hash status.
+- **"Root cause?"** We call it incident analysis: a confidence-scored
+  hypothesis with stated limitations — IMU data can't see actuator faults.
+- **"What's simulated?"** Sim source: motion + battery/temp. Arm: real
+  joints/currents, battery/temp NOT MEASURED. Link: model. Terrain: real
+  SRTM data as display context.
+- **"Restart mid-transfer?"** Kill either process; both persist and resume;
+  the report completes exactly once (tests 09/10).

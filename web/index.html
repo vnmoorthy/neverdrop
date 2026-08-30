@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NeverDrop · Mission Control</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   /* glacier-light: ice-white instrument, one signal color (black-box orange-red),
@@ -13,8 +12,8 @@
   --ground:#F4F6F8; --surface:#FDFDFE; --surface2:#F0F3F6; --line:#E1E7EC;
   --ink:#171A20; --muted:#5C6670; --accent:#E82127; --ice:#3E6F8E;
   --good:#0E8F63; --warn:#B26A05; --bad:#D42B1E;
-  --disp:'Big Shoulders Display','Arial Narrow',system-ui,sans-serif;
-  --ui:'Montserrat','Helvetica Neue',Arial,sans-serif;
+  --disp:'Arial Narrow','Avenir Next Condensed','Helvetica Neue',system-ui,sans-serif;
+  --ui:'Avenir Next','Montserrat','Helvetica Neue',Arial,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
@@ -212,6 +211,14 @@ input[type=range]{width:110px}
   #main{grid-template-columns:minmax(210px,260px) 1fr;grid-template-rows:1fr}
   .col:last-child{display:none}                       /* right rail folds away */
 }
+
+#truth-strip{display:flex;flex-wrap:wrap;gap:6px 22px;padding:7px 22px;flex:none;
+  background:#EDF2F6;border-bottom:1px solid rgba(23,26,32,.07);
+  font-family:var(--ui);font-size:8.5px;font-weight:600;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--muted)}
+#truth-strip b{color:var(--ink);font-weight:700;margin-left:4px}
+#truth-strip b.warn{color:var(--warn)}
+#truth-strip b.ok{color:var(--good)}
 </style>
 </head>
 <body>
@@ -229,6 +236,15 @@ input[type=range]{width:110px}
     <div class="tb-item"><span class="k">NO CLOUD</span><span class="v hot">2 KBPS ONLY</span></div>
   </div>
 
+  <div id="truth-strip">
+    <span>LINK <b id="ts-link">LAB 2 KBPS MODEL</b></span>
+    <span>SOURCE <b id="ts-source">—</b></span>
+    <span>SOURCE STATUS <b id="ts-kind">—</b></span>
+    <span>SATELLITE HARDWARE <b class="warn">NONE</b></span>
+    <span>DATA VIEW <b>TRANSMITTED</b> · harness panel labeled below</span>
+    <span>REPORT COVERAGE <b id="ts-cov">—</b></span>
+    <span>INTEGRITY <b id="ts-integrity">—</b></span>
+  </div>
   <div id="main">
     <!-- left column -->
     <div class="col">
@@ -278,7 +294,7 @@ input[type=range]{width:110px}
     <!-- right column -->
     <div class="col">
       <div class="panel" id="analysis">
-        <h2>ROOT CAUSE · COMPUTED FROM TRANSMITTED DATA</h2>
+        <h2>INCIDENT ANALYSIS · GROUND-COMPUTED INFERENCE</h2>
         <div class="sum" id="analysis-sum">No incident analyzed yet.</div>
         <div class="metrics" id="analysis-metrics"></div>
       </div>
@@ -305,7 +321,7 @@ input[type=range]{width:110px}
   </div>
 
   <div id="opstrip">
-    <div class="op-group"><span class="k">LINK</span>
+    <div class="op-group"><span class="k">LOCAL TEST HARNESS · NEVER TRANSMITTED · LINK</span>
       <button id="btn-linkup" class="primary">✂ CUT THE LINK</button>
       <input type="range" id="sl-bps" min="300" max="9600" step="100" value="2000"><output id="o-bps">2000 bps</output>
       <input type="range" id="sl-loss" min="0" max="50" step="5" value="0"><output id="o-loss">0% loss</output>
@@ -415,12 +431,12 @@ const strips = {
 };
 function redrawStrips(){
   const win = S.hb.slice(-120);
-  strips.vbatt.draw(win.map(h=>h.vbatt));
-  strips.temp.draw(win.map(h=>h.temp));
+  strips.vbatt.draw(win.map(h=>h.vbatt).filter(v=>v!=null));
+  strips.temp.draw(win.map(h=>h.temp).filter(v=>v!=null));
   const last = win[win.length-1];
   if(last){
-    $("v-vbatt").textContent = last.vbatt.toFixed(1)+" V";
-    $("v-temp").textContent = last.temp+" °C";
+    $("v-vbatt").textContent = last.vbatt==null? "NOT MEASURED" : last.vbatt.toFixed(1)+" V";
+    $("v-temp").textContent = last.temp==null? "NOT MEASURED" : last.temp+" °C";
     $("hb-bytes").textContent = last.bytes+" B each";
   }
 }
@@ -684,16 +700,20 @@ function buildHumanoid(){
 }
 function buildArm(nj){
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.14,24), matDark);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.14,24), matVisor);
   base.rotation.x = Math.PI/2; base.position.z = .07; g.add(base);
   const links = [];
   let parent = g, zoff = .14;
   for(let i=0;i<nj;i++){
     const joint = new THREE.Group(); joint.position.z = zoff; parent.add(joint);
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.4), i%2? matBody: matAcc);
-    seg.position.z = .2; joint.add(seg);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(.075,16,12), matJoint);
+    joint.add(ball);
+    const seg = new THREE.Mesh(new THREE.CapsuleGeometry(.05,.26,6,14), matShell);
+    seg.rotation.x = Math.PI/2; seg.position.z = .2; joint.add(seg);
     links.push(joint); parent = joint; zoff = .4;
   }
+  const tip = new THREE.Mesh(new THREE.BoxGeometry(.07,.1,.12), matGlow);
+  tip.position.z = zoff; parent.add(tip);
   return {group:g, links};
 }
 function setModel(nj){
@@ -936,7 +956,10 @@ function autoPlay(rep){
 
 /* ============================ analysis ============================= */
 function renderAnalysis(a){
-  $("analysis-sum").textContent = a.summary;
+  const head = a.label ? (a.label + " \u00b7 confidence " + (a.confidence!==undefined? a.confidence : "?") + " \u2014 ") : "";
+  $("analysis-sum").innerHTML = "<b style='color:var(--accent)'>" + head + "</b>" +
+    a.summary + (a.limitations? "<br><span style='color:var(--muted);font-size:11px'>Limitations: " +
+    a.limitations.join(", ") + ".</span>" : "");
   const m = $("analysis-metrics"); m.innerHTML = "";
   const mk=(k,v,hot)=>{ const d=document.createElement("span"); d.className="chip"+(hot?" hot":""); d.innerHTML=k+" <b>"+v+"</b>"; m.appendChild(d); };
   mk("PEAK", a.peak_g+" g", a.kind!=="arm");
@@ -986,7 +1009,15 @@ function getReport(id){
 function handle(ev, replayed){
   if(!replayed) S.events.push(ev);
   switch(ev.type){
-    case "hello": S.sourceName = ev.source; $("src-badge").textContent = "SOURCE: "+ev.source.toUpperCase(); break;
+    case "hello": {
+      S.sourceName = ev.source;
+      $("src-badge").textContent = "SOURCE: "+ev.source.toUpperCase();
+      $("ts-source").textContent = ev.source.toUpperCase();
+      $("ts-kind").textContent = ev.source_kind || "—";
+      $("ts-kind").className = ev.source_kind === "REAL MEASUREMENT" ? "ok" : "warn";
+      if(ev.link_profile) $("ts-link").textContent = ev.link_profile;
+      break;
+    }
     case "state": {
       S.liveCount++;
       if(ev.t >= (S._lastPoseT||0)){       // stale frame after restore: skip pose
@@ -1066,6 +1097,26 @@ function handle(ev, replayed){
       // the 2 kbps link (see case "hb"), keeping the README claim true
       break;
     }
+    case "manifest": {
+      if(ev.tier > 2) break;
+      if(S.activeBurst !== ev.report){ resetWall(); S.activeBurst = ev.report; }
+      ensureBlocks(ev.tier, ev.total);
+      $("lab-t"+ev.tier).textContent = "0 / "+ev.total+" pkts (manifest)";
+      break;
+    }
+    case "progress": {
+      if(ev.tier > 2 || ev.total === undefined) break;
+      if(S.activeBurst !== null && ev.report !== S.activeBurst) break;
+      ensureBlocks(ev.tier, ev.total);
+      const holder = $("blocks-t"+ev.tier);
+      const blk = holder.children[ev.seq];
+      if(blk) blk.classList.add(ev.dup ? "bad" : "on");
+      $("lab-t"+ev.tier).textContent =
+        ev.got+" / "+ev.total+" · "+(ev.dups||0)+" dup · "+(ev.corrupt||0)+" bad";
+      $("ts-cov").textContent = "T"+ev.tier+" "+ev.got+"/"+ev.total;
+      $("ts-integrity").textContent = "PENDING"; $("ts-integrity").className = "warn";
+      break;
+    }
     case "incident": { const rep = getReport(ev.report); rep.cause = ev.cause;
       // no banner here: this is the in-process debug channel. It only
       // pre-stages the cause string for the link-driven banner.
@@ -1076,6 +1127,11 @@ function handle(ev, replayed){
     case "packet": onPacket(ev); break;
     case "corrupt": onPacket(ev); break;
     case "segment": {
+      if(ev.verified && ev.tier <= 2){
+        $("lab-t"+ev.tier).textContent = ev.coverage+" · VERIFIED · HASH OK";
+        $("ts-cov").textContent = "T"+ev.tier+" "+ev.coverage;
+        $("ts-integrity").textContent = "HASH OK"; $("ts-integrity").className = "ok";
+      }
       const rep = getReport(ev.report);
       rep.segments[ev.tier] = ev;
       if(!replayed && (ev.tier===1 && !rep.segments[2])) autoPlay(rep);

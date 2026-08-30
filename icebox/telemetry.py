@@ -217,50 +217,106 @@ class PhoneSource:
     """
 
     rate_hz = 100.0
+    STALE_S = 0.5          # do not fuse sensor values older than this
 
     def __init__(self):
         self.queue: asyncio.Queue[Sample] = asyncio.Queue(maxsize=4096)
-        self._latest: dict = {}
+        # per-sensor timestamp buffers: name -> list[(t_s, values_dict)]
+        self._buf: dict[str, list] = {}
         self.last_push = 0.0
+        self._last_emit_t = 0.0
+        self.health = {"platform": "unknown", "standardized": "unknown",
+                       "aligned": 0, "stale_rejected": 0, "dup_rejected": 0,
+                       "bad_quat": 0, "calibrated": False,
+                       "gravity_mag": None, "noise_g": None}
+        self._cal: list[float] = []
+
+    def _nearest(self, name: str, t: float):
+        """Nearest-in-time value within STALE_S, with linear interpolation
+        between the two bracketing samples when available."""
+        buf = self._buf.get(name)
+        if not buf:
+            return None
+        lo, hi = None, None
+        for bt, bv in reversed(buf):
+            if bt <= t:
+                lo = (bt, bv)
+                break
+        for bt, bv in buf:
+            if bt >= t:
+                hi = (bt, bv)
+                break
+        pick = None
+        if lo and hi and hi[0] > lo[0]:
+            f = (t - lo[0]) / (hi[0] - lo[0])
+            pick = (t, {k: lo[1].get(k, 0) + f * (hi[1].get(k, 0) - lo[1].get(k, 0))
+                        for k in set(lo[1]) | set(hi[1])})
+        else:
+            pick = min((x for x in (lo, hi) if x), key=lambda x: abs(x[0] - t),
+                       default=None)
+        if pick is None or abs(pick[0] - t) > self.STALE_S:
+            self.health["stale_rejected"] += 1
+            return None
+        return pick[1]
 
     def feed_http(self, body: dict) -> int:
-        """Called by the web server with a Sensor Logger push payload."""
+        """Sensor Logger push. Sensors arrive on independent timestamps and
+        are aligned to the accelerometer clock; stale values are rejected,
+        not silently fused."""
+        if "deviceId" in body:
+            self.health["platform"] = str(body.get("deviceId"))[:24]
         fed = 0
-        rows: dict[int, dict] = {}
         for entry in body.get("payload", []):
-            name = entry.get("name", "")
-            vals = entry.get("values", {})
-            tns = entry.get("time", 0)
-            rows.setdefault(tns, {})[name] = vals
-        for tns in sorted(rows):
-            r = rows[tns]
-            self._latest.update(r)
-            # emit ONLY on accelerometer rows: gravity/orientation rows just
-            # update _latest (using gravity as accel would double-add gravity
-            # and poison the jerk baseline -> the shove would never trigger)
-            acc = r.get("accelerometer")
-            if not acc:
+            name, vals = entry.get("name", ""), entry.get("values", {})
+            t = entry.get("time", 0) / 1e9
+            buf = self._buf.setdefault(name, [])
+            if buf and t <= buf[-1][0]:
+                self.health["dup_rejected"] += 1     # duplicate/non-monotonic
                 continue
-            ori = self._latest.get("orientation", {})
+            buf.append((t, vals))
+            if len(buf) > 400:
+                del buf[:200]
+        for t, acc in list(self._buf.get("accelerometer", [])):
+            if t <= self._last_emit_t:
+                continue
+            self._last_emit_t = t
+            grav = self._nearest("gravity", t)
+            gyro = self._nearest("gyroscope", t) or {}
+            ori = self._nearest("orientation", t) or {}
+            if grav is None:
+                continue                              # cannot form total accel
             if {"qw", "qx", "qy", "qz"} <= ori.keys():
-                quat = (ori["qw"], ori["qx"], ori["qy"], ori["qz"])
+                q = (ori["qw"], ori["qx"], ori["qy"], ori["qz"])
+                norm = math.sqrt(sum(v * v for v in q))
+                if not (0.5 < norm < 2.0):
+                    self.health["bad_quat"] += 1
+                    q = (1.0, 0.0, 0.0, 0.0)
+                else:
+                    q = tuple(v / norm for v in q)
             else:
-                quat = _quat_from_euler(ori.get("roll", 0.0),
-                                        ori.get("pitch", 0.0),
-                                        ori.get("yaw", 0.0))
-            grav = self._latest.get("gravity", {})
-            gx = acc.get("x", 0) + grav.get("x", 0)
-            gy = acc.get("y", 0) + grav.get("y", 0)
-            gz = acc.get("z", 0) + grav.get("z", 0)
-            s = Sample(t=tns / 1e9, quat=quat,
-                       gyro=(self._latest.get("gyroscope", {}).get("x", 0.0),
-                             self._latest.get("gyroscope", {}).get("y", 0.0),
-                             self._latest.get("gyroscope", {}).get("z", 0.0)),
-                       accel=(gx / 9.81, gy / 9.81, gz / 9.81),
-                       vbatt=24.0, temp=20.0)
+                q = _quat_from_euler(ori.get("roll", 0.0),
+                                     ori.get("pitch", 0.0), ori.get("yaw", 0.0))
+            ax = (acc.get("x", 0) + grav.get("x", 0)) / 9.81
+            ay = (acc.get("y", 0) + grav.get("y", 0)) / 9.81
+            az = (acc.get("z", 0) + grav.get("z", 0)) / 9.81
+            # stationary calibration over the first ~3 s of samples
+            if not self.health["calibrated"]:
+                self._cal.append(math.sqrt(ax * ax + ay * ay + az * az))
+                if len(self._cal) >= 200:
+                    mean = sum(self._cal) / len(self._cal)
+                    var = sum((v - mean) ** 2 for v in self._cal) / len(self._cal)
+                    self.health.update(calibrated=True,
+                                       gravity_mag=round(mean, 3),
+                                       noise_g=round(math.sqrt(var), 4))
+            # battery/temperature are NOT measured by this pipeline
+            s = Sample(t=t, quat=q,
+                       gyro=(gyro.get("x", 0.0), gyro.get("y", 0.0),
+                             gyro.get("z", 0.0)),
+                       accel=(ax, ay, az), vbatt=None, temp=None)
             try:
                 self.queue.put_nowait(s)
                 fed += 1
+                self.health["aligned"] += 1
             except asyncio.QueueFull:
                 pass
         if fed:
@@ -355,12 +411,17 @@ class ArmAdapter:
         pass
 
     async def stream(self):
+        """Serial reads are blocking (~6 ms/cycle measured): run them in a
+        worker thread so the asyncio loop (link pacing, heartbeats, web)
+        never stalls behind the bus."""
+        loop = asyncio.get_running_loop()
         dt = 1.0 / self.rate_hz
         while True:
-            joints, currents = self.read_state()
+            joints, currents = await loop.run_in_executor(None, self.read_state)
+            # battery/temperature are not measured on this bus
             yield Sample(t=time.time(), quat=(1, 0, 0, 0), gyro=(0, 0, 0),
                          accel=(0, 0, 1), joints=tuple(joints),
-                         currents=tuple(currents), vbatt=24.0, temp=25.0)
+                         currents=tuple(currents), vbatt=None, temp=None)
             await asyncio.sleep(dt)
 
 

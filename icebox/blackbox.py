@@ -14,6 +14,9 @@ from dataclasses import dataclass, field
 
 # ---------------------------------------------------------------- samples
 
+WIRE_VERSION = 1
+
+
 @dataclass
 class Sample:
     t: float                    # unix seconds
@@ -23,8 +26,8 @@ class Sample:
     joints: tuple = ()                    # optional joint positions, rad
     currents: tuple = ()                  # optional joint currents, A
     pos: tuple = (0.0, 0.0)               # world x,y meters (traverse)
-    vbatt: float = 25.2                   # V
-    temp: float = 21.0                    # C
+    vbatt: float | None = 25.2            # V; None = not measured
+    temp: float | None = 21.0             # C; None = not measured
 
 
 class RingBuffer:
@@ -92,6 +95,7 @@ class CrashTrigger:
         self._prev: Sample | None = None
         self._tilt_since: float | None = None
         self._joint_base: deque = deque(maxlen=1000)
+        self._vel_base: deque = deque(maxlen=1000)
         # orientation trigger re-arms only after the robot is upright again,
         # otherwise a fallen robot refires every debounce interval forever
         self._upright_since_fire = True
@@ -134,17 +138,34 @@ class CrashTrigger:
         else:
             self._tilt_since = None
 
-        # --- joint fault (arm mode)
+        # --- joint fault (arm mode): overcurrent OR velocity spike (the
+        # latter catches a grab/yank on a torque-off arm where currents
+        # stay near zero)
         if s.currents:
             cm = max(abs(c) for c in s.currents)
             base = self._joint_base
             if len(base) > 100 and cause is None:
                 mean = sum(base) / len(base)
                 sd = math.sqrt(sum((c - mean) ** 2 for c in base) / len(base)) or 1e-6
-                if (cm - mean) / sd > self.joint_z:
+                # absolute floor: a near-zero noise baseline (real idle arm)
+                # must not turn a 1-LSB blip into a huge z-score
+                if cm > 0.35 and (cm - mean) / sd > self.joint_z:
                     j = max(range(len(s.currents)), key=lambda i: abs(s.currents[i]))
                     cause = f"joint {j} overcurrent {cm:.2f} A, z={((cm - mean) / sd):.0f}"
             base.append(cm)
+        if s.joints and prev is not None and prev.joints and cause is None:
+            dt = max(1e-3, s.t - prev.t)
+            vels = [abs(a - b) / dt for a, b in zip(s.joints, prev.joints)]
+            vm = max(vels)
+            vb = self._vel_base
+            if len(vb) > 100:
+                mean = sum(vb) / len(vb)
+                sd = math.sqrt(sum((v - mean) ** 2 for v in vb) / len(vb)) or 1e-6
+                if vm > 2.0 and (vm - mean) / sd > self.joint_z:
+                    j = vels.index(vm)
+                    cause = (f"joint {j} motion spike {vm:.1f} rad/s, "
+                             f"z={((vm - mean) / sd):.0f}")
+            vb.append(vm)
 
         if cause:
             self.st.last_fire = s.t
@@ -268,7 +289,8 @@ PAYLOAD_MAX = SBD_MAX - PKT_HEAD.size
 KIND_SEG = 1
 
 HB_MAGIC = b"HB"
-HB_STRUCT = struct.Struct("<2sHIBHBHbHBH")  # magic seq t state accel_mg tilt vbatt_mV temp buffered pct crc
+HB_STRUCT = struct.Struct("<2sBHIBHBHbHBH")  # magic ver seq t state accel_mg tilt vbatt_mV temp buffered pct crc
+VBATT_NA, TEMP_NA = 0xFFFF, -128            # "not measured" sentinels
 
 
 def crc16(data: bytes) -> int:
@@ -324,22 +346,24 @@ class Reassembler:
 
 
 def pack_heartbeat(seq: int, s: Sample, state: int, buffered: int, pct: int) -> bytes:
+    vb = VBATT_NA if s.vbatt is None else min(0xFFFE, int(s.vbatt * 1000))
+    tp = TEMP_NA if s.temp is None else int(max(-127, min(127, s.temp)))
     body = HB_STRUCT.pack(
-        HB_MAGIC, seq & 0xFFFF, int(s.t) & 0xFFFFFFFF, state,
+        HB_MAGIC, WIRE_VERSION, seq & 0xFFFF, int(s.t) & 0xFFFFFFFF, state,
         min(65535, int(_mag(s.accel) * 1000)), min(255, int(tilt_deg(s.quat))),
-        int(s.vbatt * 1000), int(max(-128, min(127, s.temp))),
-        min(65535, buffered), min(255, pct), 0)
+        vb, tp, min(65535, buffered), min(255, pct), 0)
     crc = crc16(body[:-2])
     return body[:-2] + struct.pack("<H", crc)
 
 
 # ---------------------------------------------------------------- live stream
 #
-# NeverDrop state frames: the continuous telemetry channel. ~26 B for a
-# humanoid pose (quat + |a| + tilt), +2 B per joint. At 8 Hz that is
-# ~1.7 kbps of the 2 kbps link; heartbeats ride above it in priority.
+# NeverDrop state frames: the continuous base-state channel (attitude
+# quaternion, peak |a|, tilt, x/y position, optional joint angles). Sizes
+# and rates are derived in icebox/protocol_stats.py from these structs —
+# do not quote numbers from prose.
 
-ST_HEAD = struct.Struct("<2sHdhhhhHBBhh")  # magic seq t quat4 amag tilt nj posx posy
+ST_HEAD = struct.Struct("<2sBHdhhhhHBBhh")  # magic ver seq t quat4 amag tilt nj posx posy
 ST_MAGIC = b"ST"
 
 
@@ -350,7 +374,7 @@ def pack_state(seq: int, s: Sample, amag_g: float | None = None) -> bytes:
     if amag_g is None:
         amag_g = _mag(s.accel)
     body = ST_HEAD.pack(
-        ST_MAGIC, seq & 0xFFFF, s.t,
+        ST_MAGIC, WIRE_VERSION, seq & 0xFFFF, s.t,
         _q(s.quat[0], SCALES[3]["quat"]), _q(s.quat[1], SCALES[3]["quat"]),
         _q(s.quat[2], SCALES[3]["quat"]), _q(s.quat[3], SCALES[3]["quat"]),
         min(65535, int(amag_g * 1000)), min(255, int(tilt_deg(s.quat))),
@@ -367,7 +391,9 @@ def unpack_state(pkt: bytes) -> dict | None:
         return None
     if crc16(pkt[:-2]) != struct.unpack("<H", pkt[-2:])[0]:
         return None
-    m, seq, t, q0, q1, q2, q3, amag, tilt, nj, px, py = ST_HEAD.unpack_from(pkt)
+    m, ver, seq, t, q0, q1, q2, q3, amag, tilt, nj, px, py = ST_HEAD.unpack_from(pkt)
+    if ver != WIRE_VERSION:
+        return None
     joints = []
     if nj:
         if len(pkt) != ST_HEAD.size + nj * 2 + 2:
@@ -385,20 +411,25 @@ def unpack_state(pkt: bytes) -> dict | None:
 def unpack_heartbeat(pkt: bytes) -> dict | None:
     if len(pkt) != HB_STRUCT.size or pkt[:2] != HB_MAGIC:
         return None
-    m, seq, t, state, accel_mg, tilt, vb, temp, buffered, pct, crc = HB_STRUCT.unpack(pkt)
-    if crc16(pkt[:-2]) != crc:
+    m, ver, seq, t, state, accel_mg, tilt, vb, temp, buffered, pct, crc = HB_STRUCT.unpack(pkt)
+    if crc16(pkt[:-2]) != crc or ver != WIRE_VERSION:
         return None
     return {"type": "hb", "seq": seq, "t": t, "state": state,
-            "accel_g": accel_mg / 1000.0, "tilt": tilt, "vbatt": vb / 1000.0,
-            "temp": temp, "buffered": buffered, "pct": pct,
+            "accel_g": accel_mg / 1000.0, "tilt": tilt,
+            "vbatt": None if vb == VBATT_NA else vb / 1000.0,
+            "temp": None if temp == TEMP_NA else temp,
+            "buffered": buffered, "pct": pct,
             "bytes": HB_STRUCT.size}
 
 
 # ---------------------------------------------------------------- analysis
 
 def analyze(seg: dict) -> dict:
-    """Root-cause heuristics from a decoded segment. Honest: every number
-    below is computed from the transmitted data, nothing is scripted."""
+    """INCIDENT ANALYSIS — a ground-computed inference from transmitted IMU
+    data. This is a mechanism *hypothesis*, not an established root cause:
+    IMU telemetry alone cannot see actuator faults, terrain, or wind. Every
+    number is computed from the received bytes; nothing is scripted. The
+    caller (ground) attaches tier, coverage, and adjusts confidence."""
     n, rate = seg["n"], max(seg["rate"], 1.0)
     ax, ay, az = seg["accel"]
     amag = [math.sqrt(ax[i] ** 2 + ay[i] ** 2 + az[i] ** 2) for i in range(n)]
@@ -452,24 +483,47 @@ def analyze(seg: dict) -> dict:
         kind = "arm"
         med = sorted(joints[jw])[len(joints[jw]) // 2]
         t_j = max(range(n), key=lambda i: abs(joints[jw][i] - med)) / rate
-        summary = (f"External force on manipulator: joint {jw} deflected "
+        event_type = "external force on manipulator"
+        summary = (f"Likely external force on manipulator: joint {jw} deflected "
                    f"{math.degrees(jr[jw]):.0f} deg at t+{t_j:.2f} s with no base "
                    f"impact signature (peak {peak_g:.1f} g) — consistent with a "
                    f"grab or collision. Full joint history recorded onboard.")
+        confidence = 0.6 + (0.15 if math.degrees(jr[jw]) > 20 else 0.0)
+        alternatives = ["commanded trajectory change", "payload snag",
+                        "actuator fault (not observable from joint data alone)"]
     else:
         joint_note = (f" Largest joint excursion: joint {jw} "
                       f"({math.degrees(jr[jw]):.0f} deg)." if joints else "")
-        summary = (f"{direction.capitalize()} {axis} instability began {warn_s:.1f} s "
+        event_type = f"{direction} {axis} fall"
+        summary = (f"Likely {direction} {axis} fall: instability began {warn_s:.1f} s "
                    f"before impact"
                    + (f"; free-fall {ff_s:.2f} s (est. drop {drop_m:.1f} m)" if ff_s > 0.05 else "")
                    + f". Primary impact {peak_g:.1f} g at t+{t_peak:.2f} s. "
-                   f"Robot came to rest {attitude} (tilt {final_tilt:.0f} deg)."
+                   f"Came to rest {attitude} (tilt {final_tilt:.0f} deg)."
                    + joint_note)
+        confidence = 0.5
+        if peak_g > 5:
+            confidence += 0.15          # unambiguous impact signature
+        if ff_s > 0.05:
+            confidence += 0.1           # free-fall corroborates a fall
+        if warn_s > 0.3:
+            confidence += 0.05          # visible build-up
+        if final_tilt > 60:
+            confidence += 0.05
+        alternatives = ["slip without ground fault", "external push",
+                        "actuator or footing fault (not observable from IMU alone)"]
+
+    limitations = ["no actuator fault state", "no force/contact sensing",
+                   "no terrain imagery", "no wind measurement",
+                   "position is dead-reckoned x/y, not GNSS"]
 
     return {"peak_g": round(peak_g, 1), "t_peak": round(t_peak, 2),
             "freefall_s": round(ff_s, 2), "drop_m": round(drop_m, 1),
             "warning_s": round(warn_s, 1), "axis": axis, "direction": direction,
-            "final_attitude": attitude, "kind": kind, "summary": summary}
+            "final_attitude": attitude, "kind": kind, "summary": summary,
+            "event_type": event_type,
+            "confidence": round(min(0.85, confidence), 2),
+            "limitations": limitations, "alternatives": alternatives}
 
 
 # ---------------------------------------------------------------- report build
@@ -480,11 +534,13 @@ def build_report(ring: RingBuffer, t_incident: float, pre=10.0, post=2.0,
     win = ring.window(t_incident - pre, t_incident + post)
     if len(win) < 10:
         return {"packets": [], "sizes": {}, "n": len(win)}
+    dec = decimate(win, preview_hz)
     seg2 = encode_segment(win, tier=2, report_id=report_id)
-    seg1 = encode_segment(decimate(win, preview_hz), tier=1, report_id=report_id)
+    seg1 = encode_segment(dec, tier=1, report_id=report_id)
     p1 = packetize(seg1, report_id, 1)
     p2 = packetize(seg2, report_id, 2)
     return {"packets": p1 + p2,          # tier 1 first: preview lands first
+            "seg1": seg1, "seg2": seg2, "n1": len(dec),
             "sizes": {"tier1": len(seg1), "tier2": len(seg2),
                       "pkts1": len(p1), "pkts2": len(p2)},
             "n": len(win)}

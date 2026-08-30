@@ -7,3 +7,5 @@ phone_server.log
 nohup.out
 .DS_Store
 icebox_backup_*.json
+data/
+smoke.log

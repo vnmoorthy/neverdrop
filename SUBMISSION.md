@@ -1,41 +1,41 @@
-# Submission copy — paste-ready
+# Submission copy — paste-ready (hardened wording)
 
 **Project name:** NeverDrop
 
-**One-liner:** Mission control for robots beyond the cloud — a live 3D
-digital twin, loss-proof store-and-forward telemetry, and a flight-recorder
-black box, all through a 2,000 bit/s satellite link.
+**One-liner:** Mission control for robots beyond the cloud — a live
+base-state twin, manifest-verified store-and-forward telemetry, and a
+persistent black-box recorder over a constrained lab model of a 2 kbps
+satellite link.
 
 **Repo:** https://github.com/vnmoorthy/neverdrop
+**Recorded end-to-end demo:** https://vnmoorthy.github.io/neverdrop/
 
-**Description (short):**
-Above 8,000 m the Everest robot's only connection is ~2 kbps of Iridium —
-1,000× too slow for video. NeverDrop gives base camp eyes anyway: the
-robot's pose streams as 26-byte frames into a live 3D twin; when the link
-blacks out, the robot buffers onboard and backfills the gap on restore
-(zero samples lost, demonstrated live); and when it crashes, an onboard
-trigger bursts the last 10 seconds home as real 340-byte Iridium SBD
-packets — a scrubbable 3D crash reconstruction with an automatically
-computed root cause, ~7 s after impact. Every byte on the dashboard crossed
-a genuinely rate-limited 2 kbps UDP link with CRC-16 framing; the honesty
-ledger in the README states exactly what is simulated (the satellite is a
-loopback socket; in phone/arm mode the motion is real). CI-tested: unit
-suite + a full phone-mode end-to-end run pass on every push.
+**Description:**
+Above 8,000 m the Everest robot's only uplink is ~2 kbps of Iridium.
+NeverDrop supervises through that budget: 31-byte state frames at 7 Hz
+drive a live 3D twin (real Feetech arm integrated — actual joint telemetry
+end-to-end); blackouts coalesce status and record durably onboard, then
+backfill with a transmitted manifest and SHA-256 so the UI can honestly say
+VERIFIED · HASH OK; crashes persist to a SQLite outbox before transmission
+and deliver as 340-byte SBD-compatible chunks with ACK-driven selective
+retransmit on a 270-byte reverse channel, finite retry ending in an
+explicit PARTIAL state, and restart-resume on both ends — proven by a
+14-scenario deterministic reliability suite plus a separate-process test,
+all in CI. Every screen element is truth-labeled: source (REAL MEASUREMENT
+vs SYNTHETIC), link (LAB 2 KBPS MODEL — no satellite hardware, stated),
+and incident facts arrive only as decoded link packets. Incident analysis
+is a confidence-scored hypothesis with stated limitations, not a claimed
+root cause.
 
-**Pillars addressed:** Satellite communication (core), hardware resilience
-(black box + blackout survival), onboard autonomy (the robot decides what
-its bandwidth is worth — all edge, no cloud).
+**Pillars:** satellite communication (core), hardware resilience
+(black box, restarts, bounded storage), onboard autonomy (edge-side
+triggering, prioritization, persistence — no cloud anywhere).
 
-**Why it matters beyond Everest:** video physically cannot supervise robot
-fleets in mines, oceans, disaster zones, or orbit; state-streaming can.
-NeverDrop is the observability layer of the physical world — per robot,
-per month — with aviation's black-box mandate as the regulatory tailwind.
+**Honest status:** physical arm streams live joint state; the modem itself
+is the next explicit integration (its message limits are already enforced
+by the SBD profile); Jetson deployment documented, untested. Full ledger:
+CLAIMS_AND_EVIDENCE.md.
 
-**Expedition deliverable:** dependency-light Python (aiohttp only); the
-onboard half runs on the Jetson Thor by changing one loopback address. It
-can ship with the team on Sept 5.
-
-**Tech:** Python/asyncio, token-bucket UDP link sim at real Iridium budgets,
-delta+zlib codec, 340 B SBD framing with CRC-16 and out-of-order
-reassembly, Three.js mission control (vendored, offline-safe), Sensor
-Logger phone IMU ingestion, Feetech serial adapter for real manipulators.
+**Tech:** Python/asyncio + aiohttp only; SQLite WAL outbox/inbox; CRC-16 +
+SHA-256 integrity; deterministic seeded link models; vendored Three.js UI
+(offline-capable, no font CDN); real SRTM terrain (display context).

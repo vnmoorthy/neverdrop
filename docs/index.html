@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NeverDrop · Mission Control</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   /* glacier-light: ice-white instrument, one signal color (black-box orange-red),
@@ -13,8 +12,8 @@
   --ground:#F4F6F8; --surface:#FDFDFE; --surface2:#F0F3F6; --line:#E1E7EC;
   --ink:#171A20; --muted:#5C6670; --accent:#E82127; --ice:#3E6F8E;
   --good:#0E8F63; --warn:#B26A05; --bad:#D42B1E;
-  --disp:'Big Shoulders Display','Arial Narrow',system-ui,sans-serif;
-  --ui:'Montserrat','Helvetica Neue',Arial,sans-serif;
+  --disp:'Arial Narrow','Avenir Next Condensed','Helvetica Neue',system-ui,sans-serif;
+  --ui:'Avenir Next','Montserrat','Helvetica Neue',Arial,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
@@ -209,8 +208,8 @@ input[type=range]{width:110px}
 }
 @media (max-width:960px){
   #topbar .tb-item:last-child{display:none}          /* NO CLOUD chip */
-  #main{grid-template-columns:minmax(210px,260px) 1fr;grid-template-rows:1fr}
-  .col:last-child{display:none}                       /* right rail folds away */
+  #main{grid-template-columns:minmax(210px,260px) 1fr}
+  .col:last-child{grid-column:1 / -1;display:flex;flex-direction:column}
 }
 #opstrip{display:none}
 #demo-banner{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;padding:12px 18px;border-top:1px solid rgba(23,26,32,.07);background:rgba(253,253,254,.85);font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
@@ -326,8 +325,9 @@ input[type=range]{width:110px}
   </div>
 </div>
 
-<div id="demo-banner"><span id="demo-msg">▶ Recorded live session — real pipeline at 2 kbps: live twin → blackout → backfill (0 lost) → crash → root cause</span>
-<a href="https://github.com/vnmoorthy/neverdrop">git clone → run it live</a></div>
+<div id="demo-banner"><span id="demo-msg">▶ RECORDED END-TO-END SESSION — source: sim (synthetic) · LAB 2 KBPS MODEL · captured from the pre-manifest build: live twin → blackout → backfill (verified) → crash → root cause</span>
+<a href="https://github.com/vnmoorthy/neverdrop">git clone → run it live</a>
+<span id="demo-controls" style="display:flex;gap:6px;flex-wrap:wrap"></span></div>
 <div id="incident-overlay"><div><div id="incident-banner">⚠ INCIDENT</div><div id="incident-cause"></div></div></div>
 
 <script src="vendor/three.min.js"></script>
@@ -1113,18 +1113,63 @@ function setState(name){
 }
 let ws = null;   // recorded session: no live socket
 const DEMO_SPEED = 2.5;
-function demoBadge(){ $("src-badge").textContent = "RECORDED SESSION \u00b7 " + DEMO_SPEED + "\u00d7"; }
-async function playSession(){
-  const evs = await (await fetch("session.json")).json();
-  demoBadge();
-  const t0 = performance.now();
-  for(const {dt, ev} of evs){
-    const wait = t0 + dt*1000/DEMO_SPEED - performance.now();
-    if(wait > 0) await new Promise(r=>setTimeout(r, wait));
+function demoBadge(){ $("src-badge").textContent = "RECORDED SESSION \u00b7 SIM \u00b7 LAB 2 KBPS \u00b7 " + DEMO_SPEED + "\u00d7"; }
+const DEMO = {evs: null, paused: false, run: 0};
+function demoChapters(evs){
+  const ch = [["01 LIVE STATE", 0]];
+  const down = evs.find(x=>x.ev.type==="status" && x.ev.up===false);
+  if(down) ch.push(["02 LINK BLACKOUT", down.dt - 1]);
+  const up = down && evs.find(x=>x.dt>down.dt && x.ev.type==="status" && x.ev.up===true);
+  if(up) ch.push(["03 RESTORE", up.dt - 1]);
+  const inc = evs.find(x=>x.ev.type==="incident");
+  if(inc) ch.push(["04 INCIDENT", Math.max(0, inc.dt - 2)]);
+  const t2 = evs.find(x=>x.ev.type==="segment" && x.ev.tier===2);
+  if(t2) ch.push(["05 VERIFIED REPORT", t2.dt - 1]);
+  return ch;
+}
+async function playFrom(startDt){
+  const run = ++DEMO.run;
+  for(const {dt, ev} of DEMO.evs){          // fast-forward to the chapter
+    if(dt >= startDt) break;
+    try{ handle(ev, true); }catch(e){}
+  }
+  let t0 = performance.now() - startDt*1000/DEMO_SPEED;
+  for(const {dt, ev} of DEMO.evs){
+    if(dt < startDt) continue;
+    if(run !== DEMO.run) return;
+    while(true){
+      if(run !== DEMO.run) return;
+      if(DEMO.paused){ await new Promise(r=>setTimeout(r,120)); t0 += 120; continue; }
+      const wait = t0 + dt*1000/DEMO_SPEED - performance.now();
+      if(wait <= 0) break;
+      await new Promise(r=>setTimeout(r, Math.min(wait, 150)));
+    }
     try{ handle(ev, false); }catch(e){ console.warn("demo event", e); }
     if(ev.type === "hello") demoBadge();
   }
-  $("demo-msg").textContent = "Session complete \u2014 the crash replay is scrubbable and loops. Clone the repo to run it live.";
+  if(run === DEMO.run)
+    $("demo-msg").textContent = "Session complete \u2014 the incident replay is scrubbable and loops. Clone the repo to run it live.";
+}
+async function playSession(){
+  DEMO.evs = await (await fetch("session.json")).json();
+  demoBadge();
+  const bar = document.getElementById("demo-controls");
+  for(const [name, at] of demoChapters(DEMO.evs)){
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.onclick = ()=> playFrom(Math.max(0, at));
+    bar.appendChild(b);
+  }
+  const pb = document.createElement("button");
+  pb.textContent = "\u275a\u275a PAUSE";
+  pb.onclick = ()=>{ DEMO.paused = !DEMO.paused;
+    pb.textContent = DEMO.paused? "\u25b6 RESUME" : "\u275a\u275a PAUSE"; };
+  bar.appendChild(pb);
+  const rb = document.createElement("button");
+  rb.textContent = "\u21ba RESTART";
+  rb.onclick = ()=> location.reload();
+  bar.appendChild(rb);
+  playFrom(0);
 }
 playSession();
 setInterval(()=>{

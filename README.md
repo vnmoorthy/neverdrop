@@ -6,142 +6,136 @@
 
 ### Mission control for robots beyond the cloud
 
-**A live 3D digital twin · loss-proof store-and-forward telemetry · a flight-recorder black box —
-all through a 2,000 bit/s satellite link. No cloud, anywhere.**
+**A live base-state twin · manifest-verified store-and-forward telemetry ·
+a persistent black-box recorder — over a constrained lab model of a
+2,000 bit/s satellite link. No cloud, no CDN, no satellite hardware —
+and it says so on screen.**
 
 [![ci](https://github.com/vnmoorthy/neverdrop/actions/workflows/ci.yml/badge.svg)](https://github.com/vnmoorthy/neverdrop/actions/workflows/ci.yml)
-[![phone e2e](https://img.shields.io/badge/phone%20E2E-ALL%20PASS-brightgreen)](test_phone_e2e.py)
-[![link budget](https://img.shields.io/badge/link%20budget-2%20kbps-orange)](icebox/linksim.py)
-[![packet limit](https://img.shields.io/badge/Iridium%20SBD-340%20bytes-blue)](icebox/blackbox.py)
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](requirements.txt)
+[![reliability](https://img.shields.io/badge/reliability_suite-14_scenarios-blue)](test_reliability.py)
+[![claims](https://img.shields.io/badge/claims-evidence_ledger-blue)](CLAIMS_AND_EVIDENCE.md)
+[![link model](https://img.shields.io/badge/link-lab_2kbps_%2B_SBD_model-orange)](PROTOCOL.md)
 [![license](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-### **[▶ &nbsp;WATCH THE LIVE DEMO](https://vnmoorthy.github.io/neverdrop/)**
-*a real captured session — genuine 2 kbps events replayed through the actual mission-control UI*
+### **[▶ &nbsp;WATCH THE RECORDED END-TO-END DEMO](https://vnmoorthy.github.io/neverdrop/)**
+*a captured session (sim source, lab 2 kbps model) replayed through the
+actual mission-control UI, with chapter navigation*
 
-[demo runbook](DEMO_RUNBOOK.md) · [submission](SUBMISSION.md) · [honesty ledger](#honesty-ledger-judges-will-ask)
+[protocol](PROTOCOL.md) · [failure matrix](FAILURE_MATRIX.md) ·
+[claims & evidence](CLAIMS_AND_EVIDENCE.md) · [deployment](DEPLOYMENT.md) ·
+[demo runbook](DEMO_RUNBOOK.md)
 
 ![The demo in 12 seconds](assets/demo.svg)
 
-*Built in one day at the Himalaya Robotics Hack 2026 · San Francisco —
-for the [Robot Everest](https://www.roboteverest.com/) expedition, which departs September 5.*
+*Built at the Himalaya Robotics Hack 2026 · San Francisco — aimed at the
+[Robot Everest](https://www.roboteverest.com/) expedition's constraint:
+above 8,000 m the only uplink is ~2 kbps of Iridium.*
 
 </div>
 
 ---
 
-Above 8,000 m the only connection to the robot is ~2 kbps of Iridium —
-video needs **1,000× more**. NeverDrop is the mission-control lifeline that
-fits through that soda straw:
+## What it does (and what that claim means)
 
-1. **Live digital twin** — the robot's full pose streams as 26-byte state
-   frames at 8 Hz; base camp watches a 3D mirror of the machine move in
-   real time on ~1.7 kbps.
-2. **Store & forward that closes its own gaps** — cut the link and the
-   robot buffers onboard; restore it and the blackout is compressed into
-   one tier-3 segment and backfilled *behind* the live stream. The chart
-   hole visibly closes: **BACKFILLED n SAMPLES · 0 LOST**.
-3. **ICEBOX black box built in** — when the robot crashes, the trigger
-   fires onboard and the last 10 s burst home as genuine 340-byte Iridium
-   SBD packets: a scrubbable 3D crash reconstruction with an automatically
-   computed root cause, ~7 s after impact.
+1. **Live base-state twin.** The robot's attitude quaternion, peak |a|,
+   tilt, x/y dead-reckoned position and optional joint angles stream as
+   **31-byte frames at 7 Hz** (43 B / 5 Hz with 6 joints) — 1,904 bps
+   including 21-byte heartbeats, inside a 2,000 bps budget. This is *base
+   state*, not full pose, and the numbers come from
+   `python -m icebox.protocol_stats`, not prose.
+2. **Verified store-and-forward.** Cut the link: current status coalesces
+   (latest value wins — no stale replay), durable data records to bounded
+   disk-backed storage. On restore, the blackout is declared in a
+   **transmitted manifest** (chunk count, sample count, declared 12.5 Hz
+   resolution, SHA-256) and the UI shows `RECEIVING x/y` →
+   `BACKFILL VERIFIED · HASH OK`. Zero-loss language appears **only** with
+   that proof.
+3. **Black box with delivery guarantees.** A crash triggers onboard; the
+   last 10 s persist to a SQLite outbox **before first transmission**, then
+   ship as 340-byte SBD-compatible chunks with manifest + ACK-driven
+   selective retransmit on a ≤270-byte reverse channel. Tier-1 preview
+   first (PRELIMINARY analysis), tier-2 refines it. Retry policy is finite
+   and ends in an explicit `PARTIAL_FAILED` — never a silent drop. Both
+   ends survive restarts and complete exactly once.
+4. **Truth boundary.** The onboard process holds no reference to ground.
+   Every incident fact on the dashboard — id, cause, chunk counts,
+   analysis — arrives as decoded link packets tagged `via:"link"`; local
+   demo controls live in a panel labeled `LOCAL TEST HARNESS · NEVER
+   TRANSMITTED`. A dedicated test proves ground can't learn incident
+   details any other way.
 
-> Fleet supervision is the bottleneck to deploying robots anywhere the
-> cloud can't follow — mines, oceans, mountains, orbit. Video doesn't
-> scale; state-streaming does. NeverDrop is the observability layer of the
-> physical world, priced per robot per month.
-
-## What's inside
-
-|  |  |  |
-|---|---|---|
-| 🤖 **Live digital twin** — 26-byte pose frames, 8 Hz, ~1.7 kbps | 📦 **Store & forward** — blackouts buffer onboard, backfill on restore | 🧊 **Black-box crash recorder** — 10 s burst, 3D replay in ~7 s |
-| 📡 **Real link discipline** — token-bucket 2 kbps UDP, 340 B SBD frames, CRC-16 | 🧠 **Root cause, computed** — impact g, free-fall, axis, rest attitude from transmitted bytes | 🦾 **Real hardware ready** — phone IMU today, Feetech serial arms via one adapter |
-| 🎛️ **Priority scheduling** — heartbeats > live frames > bursts, self-throttling | 🔁 **Supersede semantics** — a new crash preempts a draining burst, backfill survives | ✅ **CI-proven** — unit suite + full phone E2E pass on every push, from a fresh clone |
-
-## Quick start (one command)
+## Verify everything yourself
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install aiohttp
-.venv/bin/python -m icebox.server --source sim
-# open http://localhost:8000 → watch the twin → press "✂ CUT THE LINK"
+.venv/bin/python test_blackbox.py        # codec/trigger/framing: ALL PASS
+.venv/bin/python test_reliability.py     # 14 failure scenarios: ALL PASS
+.venv/bin/python test_split_roles.py     # separate processes: ALL PASS
+.venv/bin/python -m icebox.protocol_stats  # the real sizes and budgets
 ```
 
-Verify the whole pipeline without a browser:
-
-```bash
-.venv/bin/python test_blackbox.py     # unit + pipeline: must print ALL PASS
-```
-
-Prove phone mode end-to-end without a phone (synthetic Sensor Logger stream,
-quiet phase → free-fall → 7 g impact → burst → decode → root cause):
+Phone-mode end-to-end (synthetic Sensor Logger fixture — clearly labeled;
+we did not fabricate a "real" trace):
 
 ```bash
 .venv/bin/python -m icebox.server --source phone --port 8010 &
-.venv/bin/python test_phone_e2e.py    # must print PHONE E2E: ALL PASS
+.venv/bin/python test_phone_e2e.py       # PHONE E2E: ALL PASS
 ```
 
-## The demo beat
+## Run it
 
-1. The twin moves live on the wall; the SAT LINK meter reads ~1.8 / 2.0
-   kbps. *"You are watching a robot through a soda straw."*
-2. **✂ CUT THE LINK.** The twin freezes under a pulsing LINK BLACKOUT
-   banner; a counter shows samples buffering onboard; the charts tear a
-   visible hole.
-3. **▲ RESTORE LINK.** The twin snaps back live instantly; seconds later
-   the compressed backlog lands and the hole in the charts closes in front
-   of the audience: **BACKFILLED n · LOST 0**.
-4. **Shove the robot** (or a phone strapped in a boot, `--source phone`).
-   Klaxon — the ground learns of the crash from a heartbeat state bit that
-   crossed the link — and ~7 s later the 3D crash reconstruction auto-plays
-   with the root cause: *"Forward pitch instability began 0.9 s before
-   impact. Primary impact 10.9 g. Robot came to rest face down."*
-5. ◉ LIVE returns to the twin. Total bandwidth spent: kilobytes.
-
-## Telemetry sources
-
-| flag | what | use |
-|---|---|---|
-| `--source sim` | scripted humanoid + fall | rehearsal + cannot-fail fallback |
-| `--source phone` | **live phone IMU** via Sensor Logger HTTP push | the twin mirrors the phone in your hand |
-| `--source simarm` | simulated 6-DOF arm; TRIGGER FALL = a judge grabbing it | arm-venue rehearsal |
-| `--source arm` | template adapter in `icebox/telemetry.py` | wire the venue arm SDK (20–40 min) |
-
-**Phone setup (60 s):** install *Sensor Logger*, enable **Accelerometer +
-Gyroscope + Gravity + Orientation** at 100 Hz, HTTP Push to
-`http://<laptop-ip>:8000/phone`, laptop on the phone's hotspot (venue Wi-Fi
-blocks phone→laptop). Verify by opening `http://<laptop-ip>:8000` in the
-phone's browser first.
-
-## Honesty ledger (judges will ask)
-
-- Every byte on the dashboard crossed a real UDP socket paced to 2,000 bps
-  by a token bucket (~100-line `icebox/linksim.py` — read it), framed
-  ≤340 bytes (the true Iridium SBD MO limit), CRC-16 checked, reassembled
-  out of order.
-- The live twin, charts, blackout backfill, INCIDENT banner, crash replay,
-  and root cause are all reconstructed **only** from what crossed that
-  link. The in-process debug channel drives none of them.
-- The onboard and ground halves share no state except those datagrams;
-  splitting them across a Jetson Thor and a laptop is changing the
-  loopback address in `linksim.py`. Tonight both run on one machine — we
-  say so. What's simulated: the robot (in sim modes) and space (loopback).
-  Phone mode is real motion.
-
-## Architecture
-
-```
-ONBOARD (Jetson Thor)                      GROUND (base camp laptop)
-────────────────────────                   ─────────────────────────
-source (IMU / arm SDK / phone)             UDP rx ── CRC16 + reassembly
-  ├─> live state frames 8 Hz · 26 B          ├─> LIVE 3D TWIN + charts
-  ├─> blackout? buffer onboard ──────┐       ├─> blackout overlay
-  │     restore: zlib gap segment ───┘──>    ├─> gap splice: "0 LOST"
-  ├─> 1 Hz heartbeats (priority)             ├─> state pill + klaxon
-  └─> crash trigger -> 10 s burst            └─> crash replay + root cause
-        tier1 20 Hz preview ~1.2 KB
-        tier2 200 Hz record ~24 KB      ──2 kbps token-bucket UDP──>
-        340 B SBD packets
+```bash
+python -m icebox.server --role all --source sim              # demo
+python -m icebox.server --role all --source arm              # real Feetech arm
+python -m icebox.server --role ground --port 8000 --listen-port 47700
+python -m icebox.server --role onboard --source sim --ground-host <ip> --ground-port 47700
+python -m icebox.server --role all --source sim --link-profile iridium-sbd --sbd-latency 12 --seed 7
 ```
 
-Built at the Himalaya Robotics Hack, Aug 29–30 2026, San Francisco.
+Open `http://localhost:8000`. The truth strip at the top declares the
+source (SYNTHETIC vs REAL MEASUREMENT), the link profile (LAB 2 KBPS MODEL
+or IRIDIUM SBD OPERATIONAL MODEL), `SATELLITE HARDWARE: NONE`, and live
+report coverage/integrity. Black-box archives are inspectable files:
+
+```bash
+python -m icebox.inspect_report reports/report_00001.ndz
+python -m icebox.replay_report  reports/report_00001.ndz
+```
+
+## Hardware status (evidence-based, see CLAIMS_AND_EVIDENCE.md)
+
+- **Arm — REAL, partially exercised**: a physical 6-servo Feetech bus is
+  integrated (auto-detected, 1 Mbaud, 6.3 ms read cycle measured, reads in
+  a worker thread); live joint state streams end-to-end. The grab-incident
+  flow on hardware awaits a human yank.
+- **Phone — pipeline proven on a synthetic fixture** (time-alignment,
+  staleness gates, quaternion validation tested); a live phone run is
+  pending.
+- **Jetson / satellite modem — NOT integrated.** `SatLink` is the modem
+  boundary; the SBD profile models message-session behavior with the real
+  340/270-byte limits and a configurable (default 8 s, assumption)
+  session latency.
+- Battery/temperature are **NOT MEASURED** on phone/arm sources and the UI
+  says so; simulated values appear only with the sim source.
+
+## Incident analysis, honestly
+
+The ground computes a **mechanism hypothesis** from received IMU/joint
+data: event type, peak g, free-fall estimate, dominant axis, final
+attitude — with a confidence score, coverage, an explicit limitations list
+(no actuator state, no contact sensing, no terrain/wind data) and
+alternative hypotheses. Tier-1 output is labeled PRELIMINARY; tier-2
+REFINED. It is not called a root cause, because IMU telemetry alone cannot
+establish one.
+
+## The 3D scene
+
+Terrain is real SRTM elevation of the Everest massif (26 km patch, relief
+1:1, geo-verified to within one grid cell of the summit); the GPS readout
+derives from a Base Camp anchor constant plus the transmitted position —
+display context, not navigation. The robot render is stylized; joint
+angles are the transmitted values.
+
+Architecture, wire format, priority policy and integrity model:
+[PROTOCOL.md](PROTOCOL.md). Every failure mode and its test:
+[FAILURE_MATRIX.md](FAILURE_MATRIX.md).

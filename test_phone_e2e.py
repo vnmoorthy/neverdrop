@@ -70,8 +70,9 @@ def shove_samples():
 
 
 async def main():
-    got = {"incident": None, "segments": [], "analysis": None,
-           "hb_states": set(), "states": 0}
+    got = {"incident": None, "incident_via": None, "segments": [],
+           "analysis": None, "hb_states": set(), "states": 0,
+           "coverage": {}, "gap_verified": False}
 
     async with aiohttp.ClientSession() as s:
 
@@ -85,10 +86,18 @@ async def main():
                         got["hb_states"].add(ev["state"])
                     elif ev["type"] == "incident":
                         got["incident"] = ev["cause"]
-                        print(f"  INCIDENT fired: {ev['cause']}")
+                        got["incident_via"] = ev.get("via")
+                        print(f"  INCIDENT via {ev.get('via')}: {ev['cause']}")
+                    elif ev["type"] == "gap" and ev.get("verified"):
+                        got["gap_verified"] = True
+                        print(f"  blackout backfill VERIFIED: {ev.get('coverage')}"
+                              f" chunks, {ev['n']} frames")
                     elif ev["type"] == "segment":
                         got["segments"].append((ev["tier"], ev["n"]))
-                        print(f"  segment tier {ev['tier']} decoded: {ev['n']} samples "
+                        if ev.get("verified"):
+                            got["coverage"][ev["tier"]] = ev.get("coverage")
+                        print(f"  segment tier {ev['tier']} VERIFIED "
+                              f"{ev.get('coverage')}: {ev['n']} samples "
                               f"@ {ev['rate']:.0f} Hz")
                     elif ev["type"] == "analysis":
                         got["analysis"] = ev["summary"]
@@ -105,9 +114,18 @@ async def main():
             await s.post(BASE + "/phone", json=batch(t_ns, samples))
             t_ns += int(0.2 * 1e9)
             await asyncio.sleep(0.2)
+        print("  mid-quiet BLACKOUT (4 s) ...")
+        await s.post(BASE + "/op", json={"cmd": "link", "up": False})
+        for _ in range(20):                       # phone keeps pushing
+            samples = [(k / RATE, *quiet_sample()) for k in range(20)]
+            await s.post(BASE + "/phone", json=batch(t_ns, samples))
+            t_ns += int(0.2 * 1e9)
+            await asyncio.sleep(0.2)
+        await s.post(BASE + "/op", json={"cmd": "link", "up": True})
         print("  SHOVE (free-fall -> 7 g impact)...")
-        for i in range(0, len(shove_samples()), 20):
-            chunk = shove_samples()[i:i + 20]
+        shove = shove_samples()                   # generated ONCE
+        for i in range(0, len(shove), 20):
+            chunk = shove[i:i + 20]
             chunk = [(dt - chunk[0][0], a, g, q) for dt, a, g, q in chunk]
             await s.post(BASE + "/phone", json=batch(t_ns, chunk))
             t_ns += int(0.2 * 1e9)
@@ -128,10 +146,16 @@ async def main():
             listener.cancel()
 
     assert got["incident"], "trigger never fired from phone stream"
+    assert got["incident_via"] == "link", \
+        "incident knowledge did not come from a decoded link packet"
     assert "impact" in got["incident"], f"wrong cause: {got['incident']}"
-    assert any(t == 1 for t, _ in got["segments"]), "tier-1 segment never decoded"
+    assert got["gap_verified"], "blackout backfill never verified"
+    assert got["coverage"].get(1), "tier-1 never manifest-verified"
+    c = got["coverage"][1].split("/")
+    assert c[0] == c[1], f"tier-1 coverage incomplete: {got['coverage'][1]}"
     assert got["analysis"], "no root-cause analysis produced"
-    assert 0 not in got["hb_states"] or len(got["hb_states"]) > 1, "state never left NOMINAL"
+    assert got["hb_states"], "no heartbeats crossed the link at all"
+    assert got["hb_states"] != {0}, "state never left NOMINAL"
     assert got["states"] > 20, f"live twin stream too thin: {got['states']} frames"
     print(f"  live twin: {got['states']} state frames crossed the link")
     print("PHONE E2E: ALL PASS")

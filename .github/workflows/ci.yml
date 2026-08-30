@@ -7,17 +7,36 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - run: pip install aiohttp
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements.txt
+      - name: Protocol measurements (derived from structs)
+        run: python -m icebox.protocol_stats | tee protocol_stats.txt
       - name: Unit + pipeline suite
         run: python test_blackbox.py
-      - name: Phone-mode end to end (synthetic Sensor Logger stream)
+      - name: Reliability suite (14 deterministic failure scenarios)
+        run: python test_reliability.py | tee reliability.txt
+      - name: Separate-process onboard/ground
+        run: python test_split_roles.py
+      - name: Phone-mode end to end (synthetic Sensor Logger fixture)
         run: |
-          python -m icebox.server --source phone --port 8010 &
+          python -m icebox.server --source phone --port 8010 --data-dir /tmp/ndz_phone_ci & SRV=$!
+          trap "kill $SRV 2>/dev/null || true" EXIT
           sleep 2
           python test_phone_e2e.py
+      - name: Reliability summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reliability-summary-py${{ matrix.python }}
+          path: |
+            reliability.txt
+            protocol_stats.txt
+          if-no-files-found: ignore
