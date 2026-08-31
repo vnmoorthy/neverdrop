@@ -50,9 +50,8 @@ NeverDrop is mission control built for the straw instead of the fire hose:
 | a debugger on the mountain | a **black box**: the last 10 s of every crash persisted onboard, then burst home as 340-byte SBD-compatible chunks |
 | optimism | a **truth strip**: source (SYNTHETIC vs REAL MEASUREMENT), link profile, `SATELLITE HARDWARE: NONE` — on screen at all times |
 
-Built at the **Himalaya Robotics Hack 2026 · San Francisco**, over a
-constrained *lab model* of the link — no cloud, no CDN, no satellite
-hardware, and the UI says so.
+Everything runs over a constrained *lab model* of that link — no cloud,
+no CDN, no satellite hardware, and the UI says so.
 
 ## The session in four beats
 
@@ -237,7 +236,7 @@ angles are the transmitted values.
 | [PROTOCOL.md](PROTOCOL.md) | wire format, traffic classes, ACK semantics, priority policy, integrity model |
 | [FAILURE_MATRIX.md](FAILURE_MATRIX.md) | every failure mode, its expected behavior, its test, its known limitation |
 | [CLAIMS_AND_EVIDENCE.md](CLAIMS_AND_EVIDENCE.md) | each claim mapped to the test or measurement that backs it |
-| [HARDENING_REPORT.md](HARDENING_REPORT.md) | what was hardened for judging, and what deliberately wasn't claimed |
+| [HARDENING_REPORT.md](HARDENING_REPORT.md) | what was hardened, and what deliberately isn't claimed |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Jetson / field deployment notes (documented, untested) |
 | [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) | the exact live-demo script, with fallbacks |
 
@@ -249,9 +248,9 @@ offline-capable, no CDN, no cloud, anywhere.
 
 <div align="center">
 
-**Built in one day at the Himalaya Robotics Hack 2026 · San Francisco**
-for the [Robot Everest](https://www.roboteverest.com/) expedition's
-constraint: above 8,000 m, the only uplink is ~2 kbps of Iridium.
+**Built for the [Robot Everest](https://www.roboteverest.com/)
+expedition's constraint: above 8,000 m, the only uplink is ~2 kbps
+of Iridium.**
 
 *If a robot on a mountain shouldn't die anonymously, star the repo* ⭐
 
