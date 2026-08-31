@@ -450,7 +450,36 @@ class ArmAdapter:
             self.working = False
             self._torque_off_all()
 
+    def _reconnect(self):
+        """A grab can jostle the USB cable: reopen the port instead of dying."""
+        import glob
+        try:
+            self.port_h.closePort()
+        except Exception:
+            pass
+        cands = (glob.glob("/dev/tty.usbmodem*") + glob.glob("/dev/tty.usbserial*")
+                 + glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*"))
+        if not cands:
+            return False
+        import scservo_sdk as scs
+        self.port_h = scs.PortHandler(cands[0])
+        if not self.port_h.openPort():
+            return False
+        self.port_h.setBaudRate(1000000)
+        self._work_setup = False        # re-arm torque/speed on next cycle
+        print(f"ArmAdapter: reconnected on {cands[0]}", flush=True)
+        return True
+
     def read_state(self):
+        try:
+            return self._read_state_inner()
+        except Exception as e:
+            # serial hiccup (cable jostle): hold last-known state, reconnect
+            time.sleep(0.5)
+            self._reconnect()
+            return self._last_jc if hasattr(self, "_last_jc") else                 ([0.0] * len(self.ids), [0.0] * len(self.ids))
+
+    def _read_state_inner(self):
         self._cycle += 1
         if self.working and self._cycle % 5 == 0:      # goal writes at ~10 Hz
             self._work_step()
@@ -473,6 +502,7 @@ class ArmAdapter:
             if cur > 32767:
                 cur -= 65536
             currents.append(abs(cur) * 0.0065)
+        self._last_jc = (joints, currents)
         return joints, currents
 
     def fall(self):     # physical source: the "incident" is a real grab
