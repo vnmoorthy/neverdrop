@@ -1,71 +1,104 @@
-<svg width="960" height="270" viewBox="0 0 960 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NeverDrop — telemetry that never drops">
+<svg width="960" height="270" viewBox="0 0 960 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NeverDrop — telemetry that never drops. Live twin, verified store-and-forward, black box over a 2,000 bit/s link.">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F7FAFC"/>
-      <stop offset="0.7" stop-color="#EDF2F6"/>
-      <stop offset="1" stop-color="#E2EAF0"/>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFDFE"/>
+      <stop offset="1" stop-color="#F4F7FA"/>
     </linearGradient>
+    <linearGradient id="ridgefill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E9F0F5"/>
+      <stop offset="1" stop-color="#F4F7FA" stop-opacity="0"/>
+    </linearGradient>
+    <path id="uplink" d="M700,92 C740,58 800,44 856,52" fill="none"/>
+    <path id="downlink" d="M868,62 C892,96 902,140 900,182" fill="none"/>
   </defs>
 
-  <rect width="960" height="270" fill="url(#sky)"/>
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="959" height="269" rx="10" fill="url(#paper)" stroke="#DFE7EE"/>
 
-  <!-- distant whiteout peaks -->
-  <polygon points="540,270 660,80 780,270" fill="#D9E4EC"/>
-  <polygon points="640,270 790,40 940,270" fill="#CBD9E3"/>
-  <polygon points="760,270 870,110 980,270" fill="#D9E4EC"/>
-  <polygon points="470,270 560,150 650,270" fill="#E1EAF0"/>
-
-  <!-- ice grid -->
-  <g stroke="#C9D8E2" stroke-width="1" opacity="0.7">
-    <line x1="0" y1="238" x2="960" y2="238"/>
-    <line x1="0" y1="252" x2="960" y2="252"/>
-    <line x1="0" y1="266" x2="960" y2="266"/>
+  <!-- instrument strip -->
+  <g font-family="'SF Mono', Menlo, Consolas, monospace" font-size="9.5" letter-spacing="2.5" fill="#8195A6">
+    <rect x="40" y="24" width="7" height="7" fill="#D42B1E"/>
+    <text x="56" y="31.5">NEVERDROP&#160;&#160;MISSION CONTROL</text>
+    <text x="920" y="31.5" text-anchor="end">LINK BUDGET 2,000 BIT/S</text>
   </g>
-
-  <!-- satellite dish (base camp) -->
-  <g transform="translate(505,196)">
-    <path d="M0,22 A22,22 0 0 1 22,0 L22,22 Z" fill="#2B3947"/>
-    <rect x="18" y="20" width="5" height="22" fill="#2B3947"/>
-    <rect x="10" y="40" width="22" height="4" fill="#18232E"/>
-  </g>
-
-  <!-- signal dots: robot -> dish, one gap being closed -->
-  <g fill="#E63B23">
-    <circle cx="560" cy="192" r="3.2"/>
-    <circle cx="592" cy="180" r="3.2"/>
-    <circle cx="624" cy="170" r="3.2"/>
-    <circle cx="688" cy="158" r="3.2" fill="#0E8F63"/>
-    <circle cx="720" cy="156" r="3.2"/>
-    <circle cx="752" cy="158" r="3.2"/>
-  </g>
-  <text x="656" y="150" font-family="Menlo, Consolas, monospace" font-size="11" fill="#0E8F63" text-anchor="middle">gap closed</text>
-  <text x="656" y="196" font-family="Menlo, Consolas, monospace" font-size="12" fill="#5F7688" text-anchor="middle">2,000 bit/s</text>
-
-  <!-- robot -->
-  <g transform="translate(790,150)">
-    <rect x="10" y="0" width="26" height="18" fill="#E63B23"/>
-    <rect x="30" y="5" width="9" height="6" fill="#18232E"/>
-    <rect x="4" y="20" width="38" height="44" fill="#2B3947"/>
-    <rect x="-6" y="22" width="9" height="30" fill="#18232E"/>
-    <rect x="43" y="22" width="9" height="30" fill="#18232E"/>
-    <rect x="8" y="66" width="12" height="38" fill="#2B3947"/>
-    <rect x="26" y="66" width="12" height="38" fill="#2B3947"/>
-    <rect x="4" y="104" width="18" height="9" fill="#E63B23"/>
-    <rect x="24" y="104" width="18" height="9" fill="#E63B23"/>
+  <line x1="40" y1="44" x2="920" y2="44" stroke="#E3EAF0" stroke-width="1"/>
+  <g stroke="#CBD8E2" stroke-width="1">
+    <line x1="40" y1="41" x2="40" y2="47"/><line x1="260" y1="42" x2="260" y2="46"/>
+    <line x1="480" y1="41" x2="480" y2="47"/><line x1="700" y1="42" x2="700" y2="46"/>
+    <line x1="920" y1="41" x2="920" y2="47"/>
   </g>
 
   <!-- wordmark -->
-  <text x="56" y="112" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="64" letter-spacing="1" fill="#15222D">NEVER<tspan fill="#E63B23">DROP</tspan></text>
-  <text x="60" y="144" font-family="Menlo, Consolas, monospace" font-size="14" letter-spacing="4" fill="#5F7688">TELEMETRY THAT NEVER DROPS</text>
+  <text x="54" y="146" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="62" letter-spacing="2" fill="#171A20">NEVER<tspan fill="#D42B1E">DROP</tspan></text>
+  <text x="58" y="180" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="12.5" letter-spacing="5" fill="#5F7688">TELEMETRY THAT NEVER DROPS</text>
 
-  <!-- feature chips -->
-  <g font-family="Menlo, Consolas, monospace" font-size="12.5">
-    <rect x="58" y="170" width="102" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
-    <text x="109" y="189" text-anchor="middle" fill="#1F6E93">LIVE TWIN</text>
-    <rect x="170" y="170" width="152" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
-    <text x="246" y="189" text-anchor="middle" fill="#0E8F63">STORE &amp; FORWARD</text>
-    <rect x="332" y="170" width="108" height="30" fill="#FBFDFE" stroke="#D3DEE7"/>
-    <text x="386" y="189" text-anchor="middle" fill="#E63B23">BLACK BOX</text>
+  <!-- ===== right: the Everest massif, robot, satellite hop ===== -->
+  <!-- ridge profile -->
+  <path d="M492,212 L560,168 L596,132 L622,148 L664,108 L700,84 L716,112 L742,100 L774,120 L806,112 L846,150 L900,186 L928,212"
+        fill="none" stroke="#171A20" stroke-width="1.4" opacity="0.8"/>
+  <path d="M492,212 L560,168 L596,132 L622,148 L664,108 L700,84 L716,112 L742,100 L774,120 L806,112 L846,150 L900,186 L928,212 L928,212 L492,212 Z"
+        fill="url(#ridgefill)"/>
+
+  <!-- summit tick -->
+  <line x1="700" y1="84" x2="700" y2="72" stroke="#8195A6" stroke-width="1"/>
+  <text x="700" y="64" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="8.5" letter-spacing="1.5" fill="#8195A6" text-anchor="middle">8&#8201;849 M</text>
+
+  <!-- robot marker on the flank -->
+  <g transform="translate(681,97)">
+    <rect x="-4" y="-9" width="8" height="9" fill="#D42B1E"/>
+    <line x1="0" y1="-9" x2="0" y2="-14" stroke="#D42B1E" stroke-width="1.2"/>
+    <circle cx="0" cy="-15.5" r="1.6" fill="#D42B1E"/>
   </g>
-  <text x="60" y="228" font-family="Menlo, Consolas, monospace" font-size="12" fill="#5F7688">mission control for robots beyond the cloud · built for Robot Everest</text>
+
+  <!-- satellite -->
+  <g transform="translate(862,56)" fill="#171A20">
+    <rect x="-5" y="-4" width="10" height="8" rx="1"/>
+    <rect x="-17" y="-2.5" width="9" height="5" fill="#5F7688"/>
+    <rect x="8" y="-2.5" width="9" height="5" fill="#5F7688"/>
+  </g>
+
+  <!-- base-camp ground station: tent + mast -->
+  <g transform="translate(899,190)">
+    <polygon points="-9,9 0,-5 9,9" fill="#171A20"/>
+    <line x1="11" y1="9" x2="11" y2="-13" stroke="#171A20" stroke-width="1.4"/>
+    <line x1="7" y1="-9" x2="15" y2="-9" stroke="#171A20" stroke-width="1.4"/>
+    <line x1="8" y1="-12.5" x2="14" y2="-12.5" stroke="#171A20" stroke-width="1.4"/>
+  </g>
+
+  <!-- link paths -->
+  <path d="M700,92 C740,58 800,44 856,52" fill="none" stroke="#AEBFCC" stroke-width="1" stroke-dasharray="1.5 5"/>
+  <path d="M868,62 C892,96 902,140 900,182" fill="none" stroke="#AEBFCC" stroke-width="1" stroke-dasharray="1.5 5"/>
+
+  <!-- packets in flight -->
+  <circle r="2.6" fill="#D42B1E">
+    <animateMotion dur="2.6s" repeatCount="indefinite" rotate="0">
+      <mpath href="#uplink"/>
+    </animateMotion>
+  </circle>
+  <circle r="2.6" fill="#D42B1E" opacity="0.55">
+    <animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite">
+      <mpath href="#uplink"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0.55;0.55" dur="2.6s" begin="1.3s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="2.6" fill="#0E8F63">
+    <animateMotion dur="2.2s" begin="0.6s" repeatCount="indefinite">
+      <mpath href="#downlink"/>
+    </animateMotion>
+  </circle>
+
+  <!-- verified chip, in the open sky left of the summit -->
+  <g font-family="'SF Mono', Menlo, Consolas, monospace">
+    <rect x="560" y="66" width="78" height="17" rx="8.5" fill="#EAF6F0" stroke="#BFE2D2"/>
+    <circle cx="571" cy="74.5" r="2.5" fill="#0E8F63"/>
+    <text x="579" y="78" font-size="9" letter-spacing="1.5" fill="#0E8F63">0 LOST</text>
+  </g>
+
+  <!-- bottom stat line -->
+  <line x1="40" y1="224" x2="920" y2="224" stroke="#E3EAF0" stroke-width="1"/>
+  <g font-family="'SF Mono', Menlo, Consolas, monospace" font-size="10.5" letter-spacing="1.8" fill="#5F7688">
+    <text x="56" y="248">LIVE TWIN &#183; 31-BYTE FRAMES</text>
+    <text x="480" y="248" text-anchor="middle">STORE &amp; FORWARD &#183; SHA-256 VERIFIED</text>
+    <text x="904" y="248" text-anchor="end">BLACK BOX &#183; 340-BYTE SBD</text>
+  </g>
 </svg>
