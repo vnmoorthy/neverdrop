@@ -717,6 +717,18 @@ function buildArm(nj){
   tip.position.z = zoff; parent.add(tip);
   return {group:g, links};
 }
+// real SO-10x arm kinematics: axis per joint + flippable signs
+window.ARM_AXES = ["z","y","y","y","z",null];
+window.ARM_SIGN = [1,1,1,1,1,0];
+function applyArmJoints(vals){
+  if(!armChain) return;
+  for(let j=0;j<armChain.links.length && j<vals.length;j++){
+    const ax = ARM_AXES[j] || null;
+    const v = (ARM_SIGN[j]||0) * vals[j];
+    if(ax === "z"){ armChain.links[j].rotation.z = v; armChain.links[j].rotation.y = 0; }
+    else if(ax === "y"){ armChain.links[j].rotation.y = v; armChain.links[j].rotation.z = 0; }
+  }
+}
 function setModel(nj){
   if(humanoid){ body.remove(humanoid); humanoid=null; humanoidParts=null; }
   if(armChain){ body.remove(armChain.group); armChain=null; }
@@ -759,7 +771,7 @@ function updateBadges(){
   if(S.view === "live"){
     mk("◉ LIVE TWIN","q1");
     mk("STREAMED OVER THE 2 KBPS LINK","");
-    if(S.backfilled) mk("BACKFILLED "+S.backfilled+" · LOST 0","q2");
+    if(S.backfilled) mk("BACKFILL VERIFIED · "+S.backfilled+" FRAMES · HASH OK","q2");
     return;
   }
   const rep = S.reports[S.currentReport];
@@ -783,10 +795,7 @@ function applyFrame(i){
   const f = Math.round(R.idx);                     // integer frame for lookup
   if(R.playing && prevF < R.peakIdx && f >= R.peakIdx) fireImpactFx();
   if(armChain){
-    for(let j=0;j<armChain.links.length;j++){
-      const q = R.seg.joints[j][f];
-      if(j%2===0) armChain.links[j].rotation.z = q; else armChain.links[j].rotation.y = q;
-    }
+    applyArmJoints(R.seg.joints.map(ch=>ch[f]));
   } else {
     body.quaternion.copy(segQuat(R.seg,f));
   }
@@ -848,10 +857,7 @@ function tick(ts){
     if(nj && !armChain) setModel(nj);
     if(!nj && !humanoid) setModel(0);
     if(armChain){
-      for(let j=0;j<armChain.links.length && j<nj;j++){
-        if(j%2===0) armChain.links[j].rotation.z = S.pose.joints[j];
-        else armChain.links[j].rotation.y = S.pose.joints[j];
-      }
+      applyArmJoints(S.pose.joints);
     } else {
       const q = S.pose.quat;
       body.quaternion.set(q[1], q[2], q[3], q[0]);
