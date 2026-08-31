@@ -467,8 +467,15 @@ def build_app(args, onboard: Onboard | None, ground: Ground | None,
         if op == "fall":
             source.reset()
             source.fall()
+        elif op == "work" and hasattr(source, "work_start"):
+            if cmd.get("on", True):
+                source.work_start()
+            else:
+                source.work_stop()
         elif op == "reset":
             source.reset()
+            if hasattr(source, "work_stop"):
+                source.work_stop()
             if onboard:
                 onboard.state = bb.STATE_NOMINAL
                 tl = onboard.trigger.tilt_limit

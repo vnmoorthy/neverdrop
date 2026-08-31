@@ -327,6 +327,7 @@ input[type=range]{width:110px}
       <input type="range" id="sl-loss" min="0" max="50" step="5" value="0"><output id="o-loss">0% loss</output>
     </div>
     <div class="op-group"><span class="k">BLACK BOX</span>
+      <button id="btn-work">▶ WORK LOOP</button>
       <button id="btn-fall">⚠ TRIGGER FALL</button>
       <button id="btn-reset">RESET ROBOT</button>
       <button id="btn-armed" class="toggled">TRIGGER ARMED</button>
@@ -1177,6 +1178,12 @@ setInterval(()=>{
 /* ============================ op strip ============================= */
 // commands go over stateless HTTP POST — never blocked by websocket state
 const send = o => { fetch("/op", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(o)}).catch(()=>{}); };
+$("btn-work").onclick = e=>{
+  const on = !e.target.classList.contains("toggled");
+  e.target.classList.toggle("toggled", on);
+  e.target.textContent = on? "■ STOP WORK" : "▶ WORK LOOP";
+  send({cmd:"work", on});
+};
 $("btn-fall").onclick = ()=> send({cmd:"fall"});
 $("btn-reset").onclick = ()=> send({cmd:"reset"});
 $("btn-armed").onclick = e=>{ const on=!e.target.classList.contains("toggled"); e.target.classList.toggle("toggled",on); e.target.textContent = on?"TRIGGER ARMED":"TRIGGER DISARMED"; send({cmd:"arm",on}); };

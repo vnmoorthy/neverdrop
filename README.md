@@ -104,10 +104,13 @@ python -m icebox.replay_report  reports/report_00001.ndz
 
 ## Hardware status (evidence-based, see CLAIMS_AND_EVIDENCE.md)
 
-- **Arm — REAL, partially exercised**: a physical 6-servo Feetech bus is
-  integrated (auto-detected, 1 Mbaud, 6.3 ms read cycle measured, reads in
-  a worker thread); live joint state streams end-to-end. The grab-incident
-  flow on hardware awaits a human yank.
+- **Arm — REAL, working**: a physical 6-servo Feetech bus is integrated
+  (auto-detected, 1 Mbaud, 6.3 ms read cycle, serial I/O in a worker
+  thread) and the arm **runs a commanded scan routine** (torque-managed,
+  ±6° clamped, slow speed register, torque-off on stop/exit). The
+  commanded motion was verified in the transmitted state frames at ground.
+  Grabbing the working arm is the live incident: real current spike +
+  joint-velocity trigger → black box. The grab itself awaits a human hand.
 - **Phone — pipeline proven on a synthetic fixture** (time-alignment,
   staleness gates, quaternion validation tested); a live phone run is
   pending.

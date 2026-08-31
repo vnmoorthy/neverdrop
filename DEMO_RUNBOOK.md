@@ -19,9 +19,10 @@ refills by design).
 > and everything on this screen marked 'link' arrived as decoded packets,
 > not through a back door. The test-harness controls are labeled below."
 
-**3 · Live state (0:25).** Move the arm by hand:
-> "31-byte state frames, seven per second. That's the whole supervision
-> feed — base state, not video."
+**3 · Live state (0:25).** Press ▶ WORK LOOP — the real arm starts its scan routine:
+> "That arm is really moving — a commanded survey routine — and the twin
+> you see is reconstructed from 43-byte joint-state frames, five per
+> second. That's the whole supervision feed. No video."
 
 **4 · Blackout (0:40).** A judge presses ✂ CUT THE LINK:
 > "Status is latest-value — nothing stale queues. Durable data keeps
@@ -32,7 +33,7 @@ refills by design).
 > a manifest with a hash — and delivers it: RECEIVING… VERIFIED, HASH OK.
 > We never say 'zero lost' without that proof."
 
-**6 · Incident (1:15).** Yank the arm hard:
+**6 · Incident (1:15).** Grab the WORKING arm (or yank a joint hard):
 > "Onboard trigger. The report is persisted to a SQLite outbox *before*
 > transmission, then chunked with a manifest. Watch the wall: unique,
 > duplicate, corrupt counts — and selective retransmit on a 270-byte

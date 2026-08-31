@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import random
 import time
 
@@ -345,8 +346,16 @@ class ArmAdapter:
     """
 
     rate_hz = 50.0
-    ADDR_PRESENT_POSITION = 56    # STS3215: 2 bytes
-    ADDR_PRESENT_CURRENT = 69     # STS3215: 2 bytes, ~6.5 mA/LSB
+    ADDR_TORQUE_ENABLE = 40       # STS3215: 1 byte
+    ADDR_GOAL_POSITION = 42       # 2 bytes
+    ADDR_GOAL_SPEED = 46          # 2 bytes (steps/s; small = slow)
+    ADDR_PRESENT_POSITION = 56    # 2 bytes
+    ADDR_PRESENT_CURRENT = 69    # 2 bytes, ~6.5 mA/LSB
+
+    # WORK LOOP SAFETY RAILS (the arm moves in the real world):
+    WORK_AMP_TICKS = 70           # ~6 deg; env ICEBOX_ARM_AMP overrides, hard cap 150
+    WORK_SPEED = 160              # slow goal speed (steps/s)
+    WORK_JOINTS = (0, 3, 4)       # base + wrist pair only, phase-shifted
 
     def __init__(self):
         import glob
@@ -383,9 +392,71 @@ class ArmAdapter:
                 f"Port {port} opened but no servos answered on IDs "
                 f"{self.ids}. Check baud (ICEBOX_ARM_BAUD) and cabling.")
         self.ids = alive
+        self.working = False          # scan-routine flag (set via harness)
+        self._work_setup = False
+        self._work_t0 = 0.0
+        self._cycle = 0
+        self.amp = min(150, int(os.environ.get("ICEBOX_ARM_AMP",
+                                               str(self.WORK_AMP_TICKS))))
+        import atexit
+        atexit.register(self._torque_off_all)
         print(f"ArmAdapter: {port} @ {baud} baud, servos {alive}")
 
+    # ---------------------------------------------------------- work loop
+    # The arm's job in this project: a slow scan routine that NeverDrop
+    # supervises over the constrained link. All motion is clamped to
+    # +-amp ticks (~6 deg) around the captured center at a slow speed
+    # register, and torque drops on stop/reset/exception/exit.
+    def work_start(self):
+        self.working = True
+
+    def work_stop(self):
+        self.working = False
+        self._work_setup = False
+        self._torque_off_all()
+
+    def _torque_off_all(self):
+        try:
+            for sid in self.ids:
+                self.pkt.write1ByteTxRx(self.port_h, sid,
+                                        self.ADDR_TORQUE_ENABLE, 0)
+        except Exception:
+            pass
+
+    def _work_step(self):
+        """Runs inside the serial worker thread (bus access serialized)."""
+        try:
+            if not self._work_setup:
+                for j in self.WORK_JOINTS:
+                    sid = self.ids[j]
+                    self.pkt.write2ByteTxRx(self.port_h, sid,
+                                            self.ADDR_GOAL_SPEED,
+                                            self.WORK_SPEED)
+                    self.pkt.write1ByteTxRx(self.port_h, sid,
+                                            self.ADDR_TORQUE_ENABLE, 1)
+                self._work_setup = True
+                self._work_t0 = time.time()
+            t = time.time() - self._work_t0
+            for k, j in enumerate(self.WORK_JOINTS):
+                sid = self.ids[j]
+                target = self._center[sid] + int(
+                    self.amp * math.sin(2 * math.pi * 0.12 * t + k * 2.1))
+                target = max(self._center[sid] - self.amp,
+                             min(self._center[sid] + self.amp, target))
+                target = max(60, min(4035, target))
+                self.pkt.write2ByteTxRx(self.port_h, sid,
+                                        self.ADDR_GOAL_POSITION, target)
+        except Exception:
+            self.working = False
+            self._torque_off_all()
+
     def read_state(self):
+        self._cycle += 1
+        if self.working and self._cycle % 5 == 0:      # goal writes at ~10 Hz
+            self._work_step()
+        elif not self.working and self._work_setup:
+            self._work_setup = False
+            self._torque_off_all()
         joints, currents = [], []
         for sid in self.ids:
             pos, res, _ = self.pkt.read2ByteTxRx(
